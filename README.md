@@ -1,6 +1,6 @@
 # projet data viz 
 
-L’OCDE dispose de nombreuses bases statistiques sur la santé (dépenses, ressources médicales, résultats sanitaires, comportements, etc.). Aujourd’hui ces informations sont dispersées et difficiles à explorer de manière unifiée. L’objectif du projet est de développer un tableau de bord interactif qui facilite l’analyse transversale de différents indicateurs liés à la santé et la comparaison entre pays.
+L’OCDE dispose de nombreuses bases statistiques sur la santé (dépenses, ressources médicales, résultats sanitaires, comportements, etc.). Aujourd’hui ces informations sont dispersées et difficiles à explorer de manière unifiée. L’objectif du projet est de développer un tableau de bord interactif qui facilite l’analyse transversale de différents indicateurs liés à la santé.
 
 # Public cible
 
