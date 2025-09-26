@@ -14,11 +14,10 @@ dta_air_quality <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ENV.EPI
 dta_mortalite_evitable <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_STAT@DF_AM,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 dta_rh_sante <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_EMP_REAC@DF_REAC,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 dta_qualite_soins <-read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HCQO@DF_HCQO,1.1/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
-
-
+dta_agri <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.TAD.ARP,DSD_AGRI_ENV@DF_AEI,1.0/AUS+AUT+BEL+CAN+CHL+COL+CRI+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ISR+ITA+JPN+KOR+LVA+LTU+LUX+MEX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+TUR+GBR+USA+EU+ARG+BRA+BGR+CHN+HRV+CYP+IND+IDN+KAZ+MLT+PHL+ROU+RUS+ZAF+UKR+VNM.A.WATER+I_AREA+W_QUALITY+BIODIV+DRINK_W+GHG_AG+O_F+NRJ+IPP+AGR+WASTE+OTH+TOTGHG_SOURCE+TOTPEST+TOTFRESHW+IRRIGATIONAREA+BIRDS+I0+MONITSITESN+MONITSITEP+MONITSITEPEST+CH4AGR+CO2AGR+N2OAGR+TOTAGR_LAND._Z._Z._Z.HA+KG+T+T_CO2E+TOE+PT_ALAR+PT_EM_NO3+PT_EM_PO4+PT_MNTR_STS+IX+M3?startPeriod=2014&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 ```
 
-Supression des colonnes informatives
+Cleaning des données
 
 ```{r}
 
@@ -31,13 +30,33 @@ dta_air_quality <- data.table(dta_air_quality)
 dta_medicament <- data.table(dta_medicament)
 dta_qualite_soins <- data.table(dta_qualite_soins)
 dta_mortalite_evitable <- data.table(dta_mortalite_evitable)
+dta_agri <- data.table(dta_agri)
 
 dta_health <- dta_health[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_health <- dta_health[, Tableau := "Health"]
+
 dta_pib <- dta_pib[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_pib <- dta_pib[, Tableau := "PIB"]
+
 dta_pib_hab <- dta_pib_hab[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_pib_hab <- dta_pib_hab[, Tableau := "PIB par Habitant"]
+
 dta_pib_sante <- dta_pib_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_pib_sante <- dta_pib_sante[, Tableau := "PIB sante"]
+
 dta_air_quality <- dta_air_quality[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_air_quality <- dta_air_quality[, Tableau := "Exposition pollution"]
+
 dta_qualite_soins <- dta_qualite_soins[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_qualite_soins <- dta_qualite_soins[, Tableau := "Qualite des soins"]
+
 dta_medicament <- dta_medicament[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_medicament <- dta_medicament[, Tableau := "Medicament"]
+
 dta_mortalite_evitable <- dta_mortalite_evitable[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite evitable"]
+
+dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_agri <- dta_agri[, Tableau := "Agriculture"]
+
 ```
