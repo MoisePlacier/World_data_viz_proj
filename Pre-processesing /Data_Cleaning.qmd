@@ -5,16 +5,16 @@ editor: visual
 ---
 
 ```{r}
-dta_health <- readRDS("data/dta_health.rds")
-dta_pib <- readRDS("data/dta_pib.rds")
-dta_pib_hab <- readRDS("data/dta_pib_hab.rds")
-dta_pib_sante <- readRDS("data/dta_pib_sante.rds")
-dta_medicament <- readRDS("data/dta_medicament.rds")
-dta_air_quality <- readRDS("data/dta_air_quality.rds")
-dta_mortalite_evitable <- readRDS("data/dta_mortalite_evitable.rds")
-dta_RH_sante <- readRDS("data/dta_RH_sante.rds")
-dta_qualite_soins <- readRDS("data/dta_qualite_soins.rds")
-dta_agri <- readRDS("data/dta_agri.rds")
+dta_health <- readRDS("../data/dta_health.rds")
+dta_pib <- readRDS("../data/dta_pib.rds")
+dta_pib_hab <- readRDS("../data/dta_pib_hab.rds")
+dta_pib_sante <- readRDS("../data/dta_pib_sante.rds")
+dta_medicament <- readRDS("../data/dta_medicament.rds")
+dta_air_quality <- readRDS("../data/dta_air_quality.rds")
+dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
+dta_RH_sante <- readRDS("../data/dta_RH_sante.rds")
+dta_qualite_soins <- readRDS("../data/dta_qualite_soins.rds")
+dta_agri <- readRDS("../data/dta_agri.rds")
 ```
 
 ```{r}
@@ -32,30 +32,11 @@ dta_qualite_soins <- data.table(dta_qualite_soins)
 ```
 
 ```{r}
-Rh_Sante$Health.profession <- as.factor(Rh_Sante$Health.profession )
-Rh_Sante$Reference.area <- as.factor(Rh_Sante$Reference.area )
-dta_qualite_soins$Unit.of.measure    <- as.factor(dta_qualite_soins$Unit.of.measure )
-dta_qualite_soins$Measure<- as.factor(dta_qualite_soins$Health.profession.activity.status )
-```
-
-```{r}
 summary(dta_qualite_soins)
 ```
 
 ```{r}
 table(Rh_Sante$Health.profession, Rh_Sante$Unit.of.measure)
-```
-
-```{r}
-dta_health <- dta_health[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
-dta_pib <- dta_pib[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
-dta_pib_hab <- dta_pib_hab[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
-dta_pib_sante <- dta_pib_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_air_quality <- dta_air_quality[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_qualite_soins <- dta_qualite_soins[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_medicament <- dta_medicament[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_mortalite_evitable <- dta_mortalite_evitable[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_RH_sante <- dta_RH_sante[, .(REF_AREA,Reference.area, Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Health.profession )]
 ```
 
 Cleaning des données
@@ -100,4 +81,28 @@ dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite evitabl
 dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_agri <- dta_agri[, Tableau := "Agriculture"]
 
+```
+
+Création du tableau final
+
+```{r}
+datalist <- list(
+  dta_health = dta_health,
+  dta_pib = dta_pib,
+  dta_pib_hab = dta_pib_hab,
+  dta_pib_sante = dta_pib_sante,
+  dta_medicament = dta_medicament,
+  dta_air_quality = dta_air_quality,
+  dta_mortalite_evitable = dta_mortalite_evitable,
+  dta_qualite_soins = dta_qualite_soins,
+  dta_agri = dta_agri
+
+)
+
+for (n in (datalist)){
+  data <- rbind(data,n)
+}
+
+data$Tableau <- as.factor(data$Tableau)
+summary(data)
 ```

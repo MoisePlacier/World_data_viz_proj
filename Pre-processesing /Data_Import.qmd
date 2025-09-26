@@ -64,13 +64,14 @@ datalist <- list(
   dta_air_quality = dta_air_quality,
   dta_mortalite_evitable = dta_mortalite_evitable,
   dta_qualite_soins = dta_qualite_soins,
-  dta_agri = dta_agri
+  dta_agri = dta_agri,
+  dta_RH_sante = dta_RH_sante
 
 )
 
 # Sauvegarde en boucle
 for(n in names(datalist)){
-  saveRDS(datalist[[n]], file = paste0("data/", n, ".rds"))
+  saveRDS(datalist[[n]], file = paste0("../data/", n, ".rds"))
 }
 
 
