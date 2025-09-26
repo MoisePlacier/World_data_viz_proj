@@ -11,5 +11,33 @@ dta_pib_hab <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.SDD.NAD,DSD
 dta_pib_sante <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_SHA%40DF_SHA,1.0/DEU+AUS+AUT+BEL+CAN+CHL+COL+KOR+CRI+DNK+ESP+EST+USA+FIN+FRA+GRC+HUN+IRL+ISL+ISR+ITA+JPN+LVA+LTU+LUX+MEX+NOR+NZL+NLD+POL+PRT+SVK+GBR+SVN+SWE+CHE+CZE+TUR+ZAF+ARG+BRA+BGR+CHN+CYP+HRV+IND+IDN+MLT+PER+ROU+THA+UKR.A.EXP_HEALTH.PT_B1GQ..._T._T._T...?startPeriod=2015&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 dta_medicament <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,HEALTH_PHMC@DF_PHMC_CONSUM,1.1/DEU+AUS+AUT+BEL+CAN+CHL+KOR+CRI+DNK+ESP+EST+FIN+FRA+GRC+HUN+IRL+ISL+ISR+ITA+LVA+LTU+LUX+NOR+NZL+NLD+POL+PRT+SVK+GBR+SVN+SWE+CZE+TUR+BGR+HRV+PER+ROU....J?startPeriod=2015&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 dta_air_quality <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ENV.EPI,DSD_AIR_POL@DF_AIR_POLL,1.0/AUT+AUS+BEL+CAN+CHL+COL+CRI+CZE+DNK+EST+FIN+FRA+DEU+GRC+HUN+ISL+IRL+ISR+ITA+JPN+LVA+LTU+LUX+MEX+NLD+NZL+NOR+POL+PRT+SVK+SVN+ESP+SWE+CHE+TUR+GBR+USA.A.POP_EXP_POL+MEAN_POP.EL_GT_10..PT_POP.?startPeriod=2011&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+dta_mortalite_evitable <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_STAT@DF_AM,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+dta_rh_sante <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_EMP_REAC@DF_REAC,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+dta_qualite_soins <-read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HCQO@DF_HCQO,1.1/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
 
+
+```
+
+Supression des colonnes informatives
+
+```{r}
+
+library(data.table)
+dta_health <- data.table(dta_health)
+dta_pib <- data.table(dta_pib)
+dta_pib_hab <- data.table(dta_pib_hab)
+dta_pib_sante <- data.table(dta_pib_sante)
+dta_air_quality <- data.table(dta_air_quality)
+dta_medicament <- data.table(dta_medicament)
+dta_qualite_soins <- data.table(dta_qualite_soins)
+dta_mortalite_evitable <- data.table(dta_mortalite_evitable)
+
+dta_health <- dta_health[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_pib <- dta_pib[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_pib_hab <- dta_pib_hab[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
+dta_pib_sante <- dta_pib_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_air_quality <- dta_air_quality[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_qualite_soins <- dta_qualite_soins[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_medicament <- dta_medicament[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_mortalite_evitable <- dta_mortalite_evitable[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 ```
