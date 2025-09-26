@@ -6,8 +6,34 @@ editor: visual
 
 
 
+```{r}
+mortalite_evitable <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_STAT@DF_AM,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+```
+
+```{r}
+Rh_Sante <- read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HEALTH_EMP_REAC@DF_REAC,1.0/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+```
+
+
+```{r}
+Qualite_resultats_soins <-read.csv("https://sdmx.oecd.org/public/rest/data/OECD.ELS.HD,DSD_HCQO@DF_HCQO,1.1/all?dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+```
 
 
 
 
+```{r}
+Rh_Sante$Health.profession <- as.factor(Rh_Sante$Health.profession )
+Rh_Sante$Reference.area <- as.factor(Rh_Sante$Reference.area )
+Rh_Sante$Unit.of.measure    <- as.factor(Rh_Sante$Unit.of.measure )
+Rh_Sante$Health.profession.activity.status<- as.factor(Rh_Sante$Health.profession.activity.status )
+```
+
+```{r}
+summary(Rh_Sante)
+```
+
+```{r}
+table(Rh_Sante$Health.profession, Rh_Sante$Unit.of.measure)
+```
 
