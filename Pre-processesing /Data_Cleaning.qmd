@@ -36,6 +36,9 @@ dta_agri <- data.table(dta_agri)
 ```{r}
 summary(dta_qualite_soins)
 ```
+```{r}
+dta_RH_sante
+```
 
 ```{r}
 table(dta_RH_sante$Health.profession, dta_RH_sante$Unit.of.measure)
@@ -74,7 +77,7 @@ dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.meas
 dta_agri <- dta_agri[, Tableau := "Agriculture"]
 
 
-dta_RH_sante <- dta_RH_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_RH_sante <- dta_RH_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Health.profession)]
 dta_RH_sante <- dta_RH_sante[, Tableau := "Ressources_Sante"]
 
 
@@ -96,11 +99,21 @@ datalist <- list(
   dta_RH_sante = dta_RH_sante
 )
 
-data <- rbindlist(datalist)
+data <- rbindlist(datalist, use.names=TRUE, fill=TRUE)
 
 data$Tableau <- as.factor(data$Tableau)
 summary(data)
+```
 
+
+```{r}
 save(data, file = "../data/data_cleaned.RData")
 
 ```
+
+
+
+```{r}
+data
+```
+
