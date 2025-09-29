@@ -15,11 +15,12 @@ dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
 dta_RH_sante <- readRDS("../data/dta_RH_sante.rds")
 dta_qualite_soins <- readRDS("../data/dta_qualite_soins.rds")
 dta_agri <- readRDS("../data/dta_agri.rds")
+
 ```
 
 ```{r}
 library(data.table)
-dta_health <- data.table(dta_health)
+dta_health <- as.data.table(dta_health)
 dta_pib <- data.table(dta_pib)
 dta_pib_hab <- data.table(dta_pib_hab)
 dta_pib_sante <- data.table(dta_pib_sante)
@@ -29,6 +30,7 @@ dta_qualite_soins <- data.table(dta_qualite_soins)
 dta_mortalite_evitable <- data.table(dta_mortalite_evitable)
 dta_RH_sante <- data.table(dta_RH_sante)
 dta_qualite_soins <- data.table(dta_qualite_soins)
+dta_agri <- data.table(dta_agri)
 ```
 
 ```{r}
@@ -36,23 +38,12 @@ summary(dta_qualite_soins)
 ```
 
 ```{r}
-table(Rh_Sante$Health.profession, Rh_Sante$Unit.of.measure)
+table(dta_RH_sante$Health.profession, dta_RH_sante$Unit.of.measure)
 ```
 
 Cleaning des données
 
 ```{r}
-
-library(data.table)
-dta_health <- data.table(dta_health)
-dta_pib <- data.table(dta_pib)
-dta_pib_hab <- data.table(dta_pib_hab)
-dta_pib_sante <- data.table(dta_pib_sante)
-dta_air_quality <- data.table(dta_air_quality)
-dta_medicament <- data.table(dta_medicament)
-dta_qualite_soins <- data.table(dta_qualite_soins)
-dta_mortalite_evitable <- data.table(dta_mortalite_evitable)
-dta_agri <- data.table(dta_agri)
 
 dta_health <- dta_health[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
 dta_health <- dta_health[, Tableau := "Health"]
@@ -78,8 +69,14 @@ dta_medicament <- dta_medicament[, Tableau := "Medicament"]
 dta_mortalite_evitable <- dta_mortalite_evitable[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite evitable"]
 
+
 dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_agri <- dta_agri[, Tableau := "Agriculture"]
+
+
+dta_RH_sante <- dta_RH_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
+dta_RH_sante <- dta_RH_sante[, Tableau := "Ressources_Sante"]
+
 
 ```
 
@@ -95,14 +92,15 @@ datalist <- list(
   dta_air_quality = dta_air_quality,
   dta_mortalite_evitable = dta_mortalite_evitable,
   dta_qualite_soins = dta_qualite_soins,
-  dta_agri = dta_agri
-
+  dta_agri = dta_agri,
+  dta_RH_sante = dta_RH_sante
 )
 
-for (n in (datalist)){
-  data <- rbind(data,n)
-}
+data <- rbindlist(datalist)
 
 data$Tableau <- as.factor(data$Tableau)
 summary(data)
+
+save(data, file = "../data/data_cleaned.RData")
+
 ```
