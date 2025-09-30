@@ -27,6 +27,12 @@ dt <- as.data.table(get(obj_name))
 ```
 
 
+```{r}
+table(dt$Tableau)
+```
+
+
+
 
 
 
@@ -45,6 +51,10 @@ dt[, NobsPerCountry := .N, by = Reference.area]
 
 ```
 
+
+
+
+
 # Selection de pays disposants de suffisemment de data
 ```{r}
 dt <- dt[NobsPerCountry > 1000]
@@ -56,17 +66,103 @@ dt <- dt[!(Reference.area %in% c("Malta", "Singapore", "Argentina"))]
 ```
 
 ```{r}
-table( dt$Tableau, dt$Reference.area)
+table(dt$Reference.area)
+```
+
+
+```{r}
+
+
+dt_summary <- dt[, 
+  .(median = median(OBS_VALUE,na.rm = TRUE), Tableau = first(Tableau)), 
+  by = .(Reference.area, Measure, Unit.of.measure)
+]
+
+
+
+dt_wide <- dcast(
+  dt_summary,
+  Reference.area ~ Tableau + Measure+ Unit.of.measure,
+  value.var = "median"
+)
+
+setnames(dt_wide, gsub(" ", "_", names(dt_wide)))
+
+```
+
+
+```{r}
+dim(dt_wide)
 ```
 
 
 
-# deep dive Ressources_Sante
+```{r}
+dt_wide
+```
+
+
+```{r}
+
+# Compter le nombre de NA par colonne
+na_count <- sapply(dt_wide, function(y) sum(is.na(y)))
+
+# Convertir en data.table pour avoir un résumé clair
+na_count_dt <- data.table(
+  variable = names(na_count),
+  na_count = na_count
+)
+
+# Nombre total de lignes (valeurs) par colonne
+na_count_dt[, total_count := nrow(dt_wide)]
+
+na_count_dt[, prop_na := na_count / total_count]
+
+na_count_dt
+```
+
+```{r}
+valid_indicators <- na_count_dt[prop_na < 0.15, as.character(variable)]
+valid_indicators
+```
+# 1) DEEP DIVE Mortalite evitable
+
+
+```{r}
+Mortalite_evitable <- dt[Tableau == "Mortalite evitable"]
+Mortalite_evitable
+```
+
+
+```{r}
+table(Mortalite_evitable$Measure)
+```
+
+
+```{r}
+table(Mortalite_evitable$Unit.of.measure)
+```
+
+## Selection de Unit.of.measure
+
+```{r}
+
+Mortalite_evitable <- Mortalite_evitable[!(Unit.of.measure %in% c("deaths"))]
+
+```
+
+```{r}
+Mortalite_evitable
+```
+
+
+# 2) deep dive Ressources_Sante
 
 ```{r}
 ressources_Sante <- dt[Tableau == "Ressources_Sante"]
 ressources_Sante
 ```
+
 ## summary pour compréhension des datas
 ```{r}
 ressources_Sante[, list(moyenne = median(OBS_VALUE), maximum = max(OBS_VALUE), Tableau = Tableau), by = list(Reference.area, Measure, Unit.of.measure, Health.profession)]
@@ -180,7 +276,7 @@ na_count_dt
 
 
 #########################################################
-# 2) Deepdive Qualite des soins
+# 3) Deepdive Qualite des soins
 ##########################################################
 
 ```{r}

@@ -4,6 +4,7 @@ format: html
 editor: visual
 ---
 
+
 ```{r}
 dta_health <- readRDS("../data/dta_health.rds")
 dta_pib <- readRDS("../data/dta_pib.rds")
