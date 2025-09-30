@@ -105,6 +105,44 @@ data$Tableau <- as.factor(data$Tableau)
 summary(data)
 ```
 
+# Nettoyage de "Measure"
+```{r}
+
+# 1. Mettre en minuscules
+data[, Measure := tolower(Measure)]
+
+# 2. Supprimer les accents
+data[, Measure := stri_trans_general(Measure, "Latin-ASCII")]
+
+# 3. Supprimer les caractères spéciaux sauf alphanumériques et espaces
+data[, Measure := gsub("[^a-z0-9 ]", "", Measure)]
+
+# 4. Remplacer les espaces par des underscores
+data[, Measure := gsub(" +", "_", Measure)]
+```
+
+# Nettoyage de Unit.of.measure
+
+```{r}
+
+# 1. Mettre en minuscules
+data[, Unit.of.measure := tolower(Unit.of.measure)]
+
+# 2. Supprimer les accents
+data[, Unit.of.measure := stri_trans_general(Unit.of.measure, "Latin-ASCII")]
+
+# 3. Supprimer les caractères spéciaux sauf alphanumériques et espaces
+data[, Unit.of.measure := gsub("[^a-z0-9 ]", "", Unit.of.measure)]
+
+# 4. Remplacer les espaces par des underscores
+data[, Unit.of.measure := gsub(" +", "_", Unit.of.measure)]
+```
+
+
+
+```{r}
+dt[, lapply(.SD, FUN = as.factor) , by = c("OBS_VALUE","TIME_PERIOD")]
+```
 
 ```{r}
 save(data, file = "../data/data_cleaned.RData")

@@ -26,38 +26,8 @@ obj_name <- load("../data/data_cleaned.RData")
 dt <- as.data.table(get(obj_name))
 ```
 
-# Nettoyage de "Measure"
-```{r}
 
-# 1. Mettre en minuscules
-dt[, Measure := tolower(Measure)]
 
-# 2. Supprimer les accents
-dt[, Measure := stri_trans_general(Measure, "Latin-ASCII")]
-
-# 3. Supprimer les caractères spéciaux sauf alphanumériques et espaces
-dt[, Measure := gsub("[^a-z0-9 ]", "", Measure)]
-
-# 4. Remplacer les espaces par des underscores
-dt[, Measure := gsub(" +", "_", Measure)]
-```
-
-# Nettoyage de Unit.of.measure
-
-```{r}
-
-# 1. Mettre en minuscules
-dt[, Unit.of.measure := tolower(Unit.of.measure)]
-
-# 2. Supprimer les accents
-dt[, Unit.of.measure := stri_trans_general(Unit.of.measure, "Latin-ASCII")]
-
-# 3. Supprimer les caractères spéciaux sauf alphanumériques et espaces
-dt[, Unit.of.measure := gsub("[^a-z0-9 ]", "", Unit.of.measure)]
-
-# 4. Remplacer les espaces par des underscores
-dt[, Unit.of.measure := gsub(" +", "_", Unit.of.measure)]
-```
 
 
 
@@ -179,8 +149,12 @@ ressources_Sante_wide <- dcast(
 setnames(ressources_Sante_wide, gsub(" ", "_", names(ressources_Sante_wide)))
 ```
 
+```{r}
+ressources_Sante_wide
+```
 
 
+## NA count
 
 
 ```{r}
@@ -243,7 +217,7 @@ setnames(Qualite_des_soins_wide2, gsub(" ", "_", names(Qualite_des_soins_wide2))
 ```{r}
 dim(Qualite_des_soins_wide2)
 ```
-
+### NA count
 ```{r}
 
 # Compter le nombre de NA par colonne
