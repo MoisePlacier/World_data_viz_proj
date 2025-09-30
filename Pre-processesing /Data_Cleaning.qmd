@@ -15,7 +15,6 @@ dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
 dta_RH_sante <- readRDS("../data/dta_RH_sante.rds")
 dta_qualite_soins <- readRDS("../data/dta_qualite_soins.rds")
 dta_agri <- readRDS("../data/dta_agri.rds")
-
 ```
 
 ```{r}
@@ -36,6 +35,7 @@ dta_agri <- data.table(dta_agri)
 ```{r}
 summary(dta_qualite_soins)
 ```
+
 ```{r}
 dta_RH_sante
 ```
@@ -80,7 +80,6 @@ dta_agri <- dta_agri[, Tableau := "Agriculture"]
 dta_RH_sante <- dta_RH_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Health.profession)]
 dta_RH_sante <- dta_RH_sante[, Tableau := "Ressources_Sante"]
 
-
 ```
 
 Création du tableau final
@@ -105,15 +104,11 @@ data$Tableau <- as.factor(data$Tableau)
 summary(data)
 ```
 
-
 ```{r}
 save(data, file = "../data/data_cleaned.RData")
 
 ```
 
-
-
 ```{r}
 data
 ```
-
