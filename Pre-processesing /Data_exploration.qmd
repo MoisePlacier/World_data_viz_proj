@@ -6,20 +6,16 @@ editor: visual
 
 ```{r}
 library(stringi)
+library(data.table)
 ```
 
+# Syntaxe pour la selection de colonnes !
 
-# Synthaxe pour la selection de colonnes ! 
+colonnes_spécifiques \<- grep("Contient_ce_String_1\|Contient_ce_String_2", names(DT), value = TRUE)
 
-colonnes_spécifiques <- grep("Contient_ce_String_1|Contient_ce_String_2", names(DT), value = TRUE)
+=\> retourne tous les noms de colonnes qui contiennent les expressions "Contient_ce_String_1" ou "Contient_ce_String_2"
 
-=> retourne tous les noms de colonnes qui contiennent les expressions "Contient_ce_String_1" ou "Contient_ce_String_2"
-
-dt_filtré <- DT[, colonnes_spécifiques] => pour filtrer les colonnes d'intêret ! 
-
-
-
-
+dt_filtré \<- DT\[, colonnes_spécifiques\] =\> pour filtrer les colonnes d'intêret !
 
 ```{r}
 obj_name <- load("../data/data_cleaned.RData")
@@ -27,6 +23,7 @@ dt <- as.data.table(get(obj_name))
 ```
 
 # Nettoyage de "Measure"
+
 ```{r}
 
 # 1. Mettre en minuscules
@@ -59,13 +56,12 @@ dt[, Unit.of.measure := gsub("[^a-z0-9 ]", "", Unit.of.measure)]
 dt[, Unit.of.measure := gsub(" +", "_", Unit.of.measure)]
 ```
 
-
-
 ```{r}
 dt[, lapply(.SD, FUN = as.factor) , by = c("OBS_VALUE","TIME_PERIOD")]
 ```
 
-# Selection de la page temporelle d'étude 
+# Selection de la page temporelle d'étude
+
 ```{r}
 dt <- dt[TIME_PERIOD >2015 & TIME_PERIOD < 2020]
 ```
@@ -76,6 +72,7 @@ dt[, NobsPerCountry := .N, by = Reference.area]
 ```
 
 # Selection de pays disposants de suffisemment de data
+
 ```{r}
 dt <- dt[NobsPerCountry > 1000]
 ```
@@ -89,30 +86,30 @@ dt <- dt[!(Reference.area %in% c("Malta", "Singapore", "Argentina"))]
 table( dt$Tableau, dt$Reference.area)
 ```
 
-
-
 # deep dive Ressources_Sante
 
 ```{r}
 ressources_Sante <- dt[Tableau == "Ressources_Sante"]
 ressources_Sante
 ```
+
 ## summary pour compréhension des datas
+
 ```{r}
 ressources_Sante[, list(moyenne = median(OBS_VALUE), maximum = max(OBS_VALUE), Tableau = Tableau), by = list(Reference.area, Measure, Unit.of.measure, Health.profession)]
 ```
 
+## Identification des modalité professions à conserver
 
+### sur le critè dont OBS_Value = 0
 
-## Identification des modalité professions à conserver 
+=\> On peut enlever ça : pas informatif
 
-### sur le critè dont OBS_Value = 0 
-
-=> On peut enlever ça : pas informatif 
 ```{r}
 ressources_Sante0 <- ressources_Sante[OBS_VALUE == 0]
 table(ressources_Sante0$Health.profession)
 ```
+
 ### Autres professions dont on se fiche (ex : autre spécialiste non classifié etc...)
 
 ```{r}
@@ -134,12 +131,7 @@ ressources_Sante <- ressources_Sante[!(Health.profession %in% c("Medical doctors
 
 ```
 
-
-
-
-
-
-## Selection des unités de mesures standardisées ! 
+## Selection des unités de mesures standardisées !
 
 ```{r}
 ressources_Sante <- ressources_Sante[!(Unit.of.measure %in% c("us_dollars_ppp_converted",
@@ -155,7 +147,7 @@ ressources_Sante <- ressources_Sante[!(Unit.of.measure %in% c("us_dollars_ppp_co
                                                               ))]
 ```
 
-## Création tableau ressources santé vezrsion wide 
+## Création tableau ressources santé vezrsion wide
 
 ```{r}
 ressources_Sante_summary <- ressources_Sante[, 
@@ -168,7 +160,6 @@ ressources_Sante_summary[, Tableau := "Ressources_Sante"]
 ressources_Sante_summary
 ```
 
-
 ```{r}
 ressources_Sante_wide <- dcast(
   ressources_Sante_summary,
@@ -178,10 +169,6 @@ ressources_Sante_wide <- dcast(
 
 setnames(ressources_Sante_wide, gsub(" ", "_", names(ressources_Sante_wide)))
 ```
-
-
-
-
 
 ```{r}
 # Compter le nombre de NA par colonne
@@ -201,23 +188,18 @@ na_count_dt[, prop_na := na_count / total_count]
 na_count_dt
 ```
 
+######################################################### 
 
-
-
-
-#########################################################
 # 2) Deepdive Qualite des soins
-##########################################################
+
+########################################################## 
 
 ```{r}
 Qualite_des_soins <- ressources_Sante <- dt[Tableau == "Qualite des soins"]
 table(Qualite_des_soins$Unit.of.measure)
 ```
 
-
-
-## 1ére approche :  selection des indicateurs de mesure de la qualité des soins par tx de NA
-
+## 1ére approche : selection des indicateurs de mesure de la qualité des soins par tx de NA
 
 ```{r}
 
@@ -238,7 +220,6 @@ Qualite_des_soins_wide2 <- dcast(
 setnames(Qualite_des_soins_wide2, gsub(" ", "_", names(Qualite_des_soins_wide2)))
 
 ```
-
 
 ```{r}
 dim(Qualite_des_soins_wide2)
@@ -263,8 +244,6 @@ na_count_dt[, prop_na := na_count / total_count]
 na_count_dt
 ```
 
-
-
 ```{r}
 # Sélectionner uniquement les indicateurs avec moins de 25% de NA
 valid_indicators <- na_count_dt[prop_na < 0.25, as.character(variable)]
@@ -276,7 +255,7 @@ Qualite_des_soins_wide2 <- Qualite_des_soins_wide2[,..valid_indicators]
 Qualite_des_soins_wide2
 ```
 
-## Mapping avec des noms user friendly 
+## Mapping avec des noms user friendly
 
 ```{r}
 mapping_QS <- data.table(
@@ -349,16 +328,13 @@ setnames(Qualite_des_soins_wide2, old = mapping_QS$original, new = mapping_QS$ne
 Qualite_des_soins_wide2
 ```
 
-
-
-## 2ème approche :  selection des indicateurs de mesure de la qualité des soins par connaissance domaines 
+## 2ème approche : selection des indicateurs de mesure de la qualité des soins par connaissance domaines
 
 ```{r}
 Qualite_des_soins <- ressources_Sante[!grepl("\\(Deprecated\\)", Measure)] # on enlève les indicateurs plus recommandé ni maintenu par l’OCDE (Deprecated)
 ```
 
-
-###  Mortalité et réadmissions hospitalières
+### Mortalité et réadmissions hospitalières
 
 Ces indicateurs mesurent l’efficacité et la sécurité clinique :
 
@@ -366,7 +342,7 @@ Ces indicateurs mesurent l’efficacité et la sécurité clinique :
 
 Justification : ces indicateurs reflètent la qualité des soins critiques et les risques liés aux traitements hospitaliers.
 
-####  Hospitalisations évitables / maladies chroniques
+#### Hospitalisations évitables / maladies chroniques
 
 Ces indicateurs traduisent la prévention, la coordination des soins et la qualité de la prise en charge :
 
@@ -374,7 +350,7 @@ Ces indicateurs traduisent la prévention, la coordination des soins et la quali
 
 Justification : les admissions pour maladies chroniques évitables signalent un suivi insuffisant ou des soins primaires inefficaces.
 
-###  Expérience et implication des patients
+### Expérience et implication des patients
 
 Ces indicateurs mesurent la qualité relationnelle et la participation aux décisions de soins :
 
@@ -382,20 +358,17 @@ Ces indicateurs mesurent la qualité relationnelle et la participation aux déci
 
 Justification : la communication et l’implication des patients sont des dimensions essentielles de la qualité des soins selon l’OMS et l’OCDE.
 
-###  Sécurité des procédures chirurgicales
+### Sécurité des procédures chirurgicales
 
 "hipfracture_surgery_initiated_within_2_days_of_hospital_admission","deep_vein_thrombosis_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data","pulmonary_embolism_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data","sepsis_following_abdominopelvic_surgery_within_30_days_of_surgery_linked_data"
 
 Justification : reflète la sécurité des soins chirurgicaux et le respect des bonnes pratiques.
 
-###  Éliminer
+### Éliminer
 
 Indicateurs financiers ou liés à l’usage de médicaments de masse (overall_volume_of_opioids_prescribed, total_volume_of_antibiotics_for_systemic_use_prescribed)
 
 Les indicateurs sur la prescription pour sous-populations spécifiques si l’objectif est la qualité générale (elderly_patients_with_prescription_of_longacting_benzodiazepines)
-
-
-
 
 ```{r}
 mapping <- data.table(
@@ -451,7 +424,6 @@ mapping <- data.table(
 mapping[, newname := paste0(friendly, "_", category)]
 ```
 
-
 ```{r}
 # Ajouter une nouvelle colonne combinant friendly + catégorie
 Qualite_des_soins[, Measure_friendly := mapping$friendly[match(Measure, mapping$original)]]
@@ -465,12 +437,11 @@ Qualite_des_soins[, Measure := paste0( Measure_category , "_", Measure_friendly)
 Qualite_des_soins <- Qualite_des_soins_mapped[Measure!= "NA_NA"]
 ```
 
-
 ```{r}
 table(Qualite_des_soins_mapped$Measure)
 ```
-### Selection des Unitées de mesures 
 
+### Selection des Unitées de mesures
 
 ```{r}
 table(Qualite_des_soins$Unit.of.measure, Qualite_des_soins$Measure  )
@@ -489,7 +460,6 @@ Qualite_des_soins_summary[, Tableau := "Qualite_des_soins"]
 Qualite_des_soins_summary
 ```
 
-
 ```{r}
 Qualite_des_soins_wide <- dcast(
   Qualite_des_soins_summary,
@@ -500,13 +470,6 @@ Qualite_des_soins_wide <- dcast(
 setnames(Qualite_des_soins_wide, gsub(" ", "_", names(Qualite_des_soins_wide)))
 ```
 
-
 ```{r}
 Qualite_des_soins_wide
 ```
-
-
-
-
-
-

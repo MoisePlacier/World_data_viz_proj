@@ -36,6 +36,7 @@ dta_agri <- data.table(dta_agri)
 ```{r}
 summary(dta_qualite_soins)
 ```
+
 ```{r}
 dta_RH_sante
 ```
@@ -105,15 +106,12 @@ data$Tableau <- as.factor(data$Tableau)
 summary(data)
 ```
 
-
 ```{r}
 save(data, file = "../data/data_cleaned.RData")
 
 ```
 
-
-
 ```{r}
+
 data
 ```
-
