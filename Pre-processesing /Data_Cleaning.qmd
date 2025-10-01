@@ -57,6 +57,7 @@ dta_pib <- dta_pib[, Tableau := "PIB"]
 dta_pib_hab <- dta_pib_hab[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
 dta_pib_hab <- dta_pib_hab[, Tableau := "PIB par Habitant"]
 
+dta_pib_sante <- dta_pib_sante[FINANCING_SCHEME == "_T"]
 dta_pib_sante <- dta_pib_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_pib_sante <- dta_pib_sante[, Tableau := "PIB sante"]
 
@@ -108,7 +109,10 @@ summary(data)
 save(data, file = "../data/data_cleaned.RData")
 
 ```
+<<<<<<< HEAD
 
 ```{r}
 data
 ```
+=======
+>>>>>>> 370e05b4bcbb34885c643c65c76825c749284639
