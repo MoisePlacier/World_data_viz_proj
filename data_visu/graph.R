@@ -3,6 +3,8 @@ library(plotly)
 library(data.table)
 library(patchwork)
 
+data <- load("../data/dta_cleaned.RData")
+
 levels(data$Tableau)
 health <- data[Tableau == "Health" & REF_AREA %in% c("FRA", "USA", "ZAF", "JPN")]
 pib_health <- data[Tableau == "PIB sante" & REF_AREA %in% c("FRA", "USA", "ZAF", "JPN") & TIME_PERIOD != "2024" ]
