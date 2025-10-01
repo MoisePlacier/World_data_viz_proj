@@ -3,7 +3,7 @@ library(plotly)
 library(data.table)
 library(patchwork)
 
-data <- load("../data/dta_cleaned.RData")
+data <- readRDS("../Data/data_cleaned.RData")
 
 levels(data$Tableau)
 health <- data[Tableau == "Health" & REF_AREA %in% c("FRA", "USA", "ZAF", "JPN")]
