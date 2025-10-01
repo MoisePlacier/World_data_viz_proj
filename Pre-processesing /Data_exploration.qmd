@@ -9,7 +9,11 @@ library(stringi)
 library(data.table)
 ```
 
+<<<<<<< HEAD
+# Synthaxe pour la selection de colonnes !
+=======
 # Syntaxe pour la selection de colonnes !
+>>>>>>> 370e05b4bcbb34885c643c65c76825c749284639
 
 colonnes_spécifiques \<- grep("Contient_ce_String_1\|Contient_ce_String_2", names(DT), value = TRUE)
 
