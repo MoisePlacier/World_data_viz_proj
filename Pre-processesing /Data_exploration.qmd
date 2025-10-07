@@ -362,18 +362,12 @@ save(Qualite_des_soins_wide, file = "../data/Qualite_des_soins_wide.RData")
 
 ```{r}
  dta_health <- readRDS("~/Code/World_health_data_proj/Data/dta_health.rds")
-```
 
-```{r}
 dta_health <- as.data.table(dta_health)
-dta_health
-```
 
-```{r}
+
 dta_health <- dta_health[TIME_PERIOD >=2015 & TIME_PERIOD <= 2020]
-```
 
-```{r}
 dta_health_summary <- dta_health[, 
   .(moyenne = median(OBS_VALUE,na.rm = TRUE)), 
   by = .(REF_AREA, Measure, Unit.of.measure)
@@ -392,22 +386,12 @@ setnames(dta_health_wide, gsub(" ", "_", names(dta_health_wide)))
 
 # MERGE ALL WIDE
 
-```{r}
-dim(finance_sante_wide)
-dim(Mortalite_evitable_wide)
-dim(ressources_Sante_wide)
-dim(Qualite_des_soins_wide)
-dim(dta_health_wide)
-```
 
 ```{r}
 merged <- Reduce(function(x, y) merge(x, y, by = "REF_AREA", all = FALSE), list(finance_sante_wide, Mortalite_evitable_wide, ressources_Sante_wide,Qualite_des_soins_wide,dta_health_wide))
 
 names(merged) <- sub("financement_sante_depenses_pourcentage_des_depenses_de_sante_", "dep_sante_", names(merged))
 
-```
-
-```{r}
 # Compter le nombre de NA par colonne
 na_count <- sapply(merged, function(y) sum(is.na(y)))
 
@@ -442,9 +426,7 @@ merged_inputed <- data.table(resultat_imputation$completeObs)
 merged_inputed[,REF_AREA := merged[,1]]
 
 setcolorder(merged_inputed, c("REF_AREA", names(merged_inputed)[names(merged_inputed) != "REF_AREA"]))  # placer 'REF_AREA' en premier
-```
 
-```{r}
 var_map <- list(
   REF_AREA = "area",
   dep_sante_Admin_administration_sante_publique = "dep_admin_pub",
@@ -524,37 +506,17 @@ var_map <- list(
   QS_Médication_Second_line_antibiotics_proportion = "qs_abx_2nd"
 )
 
-```
 
-```{r}
-names(merged_inputed)
-```
-
-```{r}
 old_names <- names(merged_inputed)
 new_names <- sapply(old_names, function(x) if (x %in% names(dict)) dict[[x]] else x)
 setnames(merged_inputed, old = old_names, new = new_names)
-```
 
-```{r}
-merged_inputed
-```
-
-```{r}
 vars <- c("dep_sante_Totale_Depenses_sante","RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers","RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives","QS_Médication_Second_line_antibiotics_proportion")
 dt_excl <- copy(merged_inputed[, .SD, .SDcols = setdiff(names(merged_inputed), vars)])
-```
 
-```{r}
 
 save(dt_excl, file = "../data/merged_inputed.RData")
-```
 
-```{r}
-names(dt_excl)
-```
-
-```{r}
 dict <- data.table(
   var_full = c(
     "REF_AREA",
@@ -663,13 +625,7 @@ dict[, var_code := c(
   "qs_hosp_copd", "qs_hosp_chf", "qs_hosp_chf_htn", "qs_hosp_htn", "qs_amput_diab",
   "qs_hosp_diab", "qs_mort_h_stroke", "qs_mort_i_stroke", "life_expectancy"
 )]
-```
 
-```{r}
-dict
-```
-
-```{r}
 # Attribution des groupes
 dict[, var_group := fifelse(grepl("^dep_sante", var_full), "Dépenses en % du total des dépenses de santé",
                      fifelse(grepl("^financement_sante", var_full), "Dépenses de santé en % du PIB du pays",
@@ -688,9 +644,7 @@ dict[, var_group := fifelse(grepl("^dep_sante", var_full), "Dépenses en % du to
 # Libellés lisibles
 dict[, var_label := gsub("_", " ", var_code)]
 
-```
 
-```{r}
 dict[, var_label_fr := c(
   "REF_AREA",
   # Dépenses en % du total
@@ -778,29 +732,15 @@ dict[, var_label_fr := c(
   "Esperance de vie (années)"
 )]
 
-```
 
-```{r}
 Labels_dict_wide <- dict
 save(Labels_dict_wide, file = "../data/Labels_dict_wide.RData")
-```
 
-```{r}
-setnames(merged_inputed, old = dict$var_full, new = dict$var_label_fr)
-```
-
-```{r}
-merged_inputed
-```
-
-```{r}
 library(data.table)
 library(dplyr)
 
 # --- 1. Définir les groupes thématiques ----
-```
 
-```{r}
 vars_groupes <- list(
   mortalite_evitable = c(
     "Mortalité évitable globale",
@@ -848,17 +788,9 @@ vars_groupes <- list(
   
   esperance_de_vie = c("Esperance de vie (années)")
 )
-```
 
-```{r}
 save(vars_groupes, file = "../data/vars_groupes_scores.RData")
-```
 
-```{r}
-names(vars_groupes)
-```
-
-```{r}
 # --- 2. Définir si chaque groupe est à maximiser ou minimiser ----
 # TRUE = plus c’est haut, mieux c’est ; FALSE = plus c’est bas, mieux c’est
 
@@ -870,15 +802,13 @@ orientation <- list(
 )
 ```
 
-# --- 3
 
-$$
-\tilde{x}{ij} =
+$$\tilde{x}{ij} =
 \begin{cases}
 \frac{x{ij} - \min(\mathbf{x}_j)}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à maximiser}, 
 \frac{\max(\mathbf{x}j) - x{ij}}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à minimiser.}
-\end{cases}
-$$ Ainsi, toutes les variables normalisées sont dans l'intervalle \[0,1\] et un score plus élevé est toujours préférable. Si un groupe g contient pg​ variables, le score du pays i pour ce groupe est la moyenne des variables normalisées dans le groupe : $$
+\end{cases}$$
+Ainsi, toutes les variables normalisées sont dans l'intervalle \[0,1\] et un score plus élevé est toujours préférable. Si un groupe g contient pg​ variables, le score du pays i pour ce groupe est la moyenne des variables normalisées dans le groupe : $$
 S_i(g) = \frac{1}{p_g} \sum_{j \in g} \tilde{x}_{ij}
 $$ où j∈g parcourt les variables appartenant au groupe g . Si on a G groupes de variables, chaque groupe g pouvant avoir un poids wg​ (par défaut, poids égaux si non spécifiés), le score global du pays i est calculé comme suit :
 
@@ -886,9 +816,9 @@ $$
 S_{i}^{\text{global}} = \frac{\sum_{g=1}^G w_g , S_i(g)}{\sum_{g=1}^G w_g}
 $$
 
-Dans le cas où tous les groupes ont le même poids, la formule se simplifie en : $$
-S_{i}^{\text{global}} = \frac{1}{G} \sum_{g=1}^G S_i(g)
-$$
+Dans le cas où tous les groupes ont le même poids, la formule se simplifie en : 
+$$S_{i}^{\text{global}} = \frac{1}{G} \sum_{g=1}^G S_i(g)$$
+
 
 ```{r}
 normalize_dir <- function(x, maximize = TRUE) {
@@ -927,32 +857,10 @@ calc_score_global <- function(dt, id_col = "REF_AREA") {
   
   return(scores_global)
 }
-```
 
-```{r}
 scores <- calc_score_global(merged_inputed)
 
-```
 
-```{r}
-print(names(scores))
-```
-
-```{r}
 save(scores, file = "../data/scores_global.RData")
 ```
 
-```{r}
-library(ggplot2)
-
-ggplot(scores, aes(x = reorder(REF_AREA, score_global), y = score_global)) +
-  geom_col(fill = "steelblue") +
-  coord_flip() +
-  labs(
-    x = "Pays",
-    y = "Score global de performance sanitaire (0–1)",
-    title = "Comparaison internationale des systèmes de santé",
-    subtitle = "Score composite pondéré par groupes d’indicateurs"
-  ) +
-  theme_minimal(base_size = 13)
-```
