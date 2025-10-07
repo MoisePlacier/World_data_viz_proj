@@ -1,0 +1,15 @@
+---
+title: "Shiny_Jules_Strcture"
+format: html
+editor: visual
+---
+
+## Structure du shiny
+
+Les inputs :
+
+1\) mode -\> preloaded ou custom
+
+2\) si preloaded -\>
+
+3\)
