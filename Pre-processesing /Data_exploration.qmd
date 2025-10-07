@@ -6,186 +6,172 @@ editor: visual
 
 ```{r}
 library(stringi)
+library(missMDA) # Pour l'imputation des données manquantes
+
+library(FactoMineR) # Pour l'analyse en composantes principales (ACP)
 ```
 
+# Synthaxe pour la selection de colonnes !
 
-# Synthaxe pour la selection de colonnes ! 
+colonnes_spécifiques \<- grep("Contient_ce_String_1\|Contient_ce_String_2", names(DT), value = TRUE)
 
-colonnes_spécifiques <- grep("Contient_ce_String_1|Contient_ce_String_2", names(DT), value = TRUE)
+=\> retourne tous les noms de colonnes qui contiennent les expressions "Contient_ce_String_1" ou "Contient_ce_String_2"
 
-=> retourne tous les noms de colonnes qui contiennent les expressions "Contient_ce_String_1" ou "Contient_ce_String_2"
+dt_filtré \<- DT\[, colonnes_spécifiques\] =\> pour filtrer les colonnes d'intêret !
 
-dt_filtré <- DT[, colonnes_spécifiques] => pour filtrer les colonnes d'intêret ! 
-
-
-
-
+```{r}
+library(data.table)
+```
 
 ```{r}
 obj_name <- load("../data/data_cleaned.RData")
+
 dt <- as.data.table(get(obj_name))
-```
 
-
-```{r}
-table(dt$Tableau)
-```
-
-
-
-
-
-
-
-```{r}
-dt[, lapply(.SD, FUN = as.factor) , by = c("OBS_VALUE","TIME_PERIOD")]
-```
 
 # Selection de la page temporelle d'étude 
-```{r}
-dt <- dt[TIME_PERIOD >2015 & TIME_PERIOD < 2020]
-```
 
-```{r}
+dt <- dt[TIME_PERIOD >=2015 & TIME_PERIOD <= 2020]
+
 dt[, NobsPerCountry := .N, by = Reference.area]
-
-```
-
-
-
 
 
 # Selection de pays disposants de suffisemment de data
-```{r}
-dt <- dt[NobsPerCountry > 1000]
-```
 
-```{r}
+dt <- dt[NobsPerCountry > 1000]
+
 
 dt <- dt[!(Reference.area %in% c("Malta", "Singapore", "Argentina"))]
 ```
 
-```{r}
-table(dt$Reference.area)
-```
-
+# 0) DEEP DIVE : ressources financières santé
 
 ```{r}
+finance_sante <- dt[Tableau == "Ressources_Financiere_Sante"]
 
+finance_sante <- finance_sante[(Mode.de.prestation %in% c("Total"))]
+finance_sante <- finance_sante[(Fonction.de.santé %in% c("Total"))]
 
-dt_summary <- dt[, 
-  .(median = median(OBS_VALUE,na.rm = TRUE), Tableau = first(Tableau)), 
-  by = .(Reference.area, Measure, Unit.of.measure)
+finance_sante <- finance_sante[(Fournisseur.de.soins.de.santé %in% c("Agences administratifs de l’assurance maladie privée",
+                                                                "Agences d’assurance maladie sociale",
+                                                                "Agences étatiques de l’administration de la santé",
+                                                                "Prestataires de services administratifs et de financement du système de soins de santé",
+                                                               
+                                                               
+                                                                "Hôpitaux",
+                                                                "Hôpitaux généraux",
+                                                                "Hôpitaux psychiatriques",
+                                                                "Hôpitaux spécialisés (autres que les hôpitaux de santé mentale)",
+                                                                "Cabinets médicaux",
+                                                               "Centres de soins ambulatoires",
+                                                               "Pharmacies",
+                                                               "Total"
+                                                              ))]
+
+mapping_Finance <- data.table(
+  original = c(
+    "Agences administratifs de l’assurance maladie privée",
+    "Agences d’assurance maladie sociale",
+    "Agences étatiques de l’administration de la santé",
+    "Prestataires de services administratifs et de financement du système de soins de santé",
+    "Hôpitaux",
+    "Hôpitaux généraux",
+    "Hôpitaux psychiatriques",
+    "Hôpitaux spécialisés (autres que les hôpitaux de santé mentale)",
+    "Cabinets médicaux",
+    "Centres de soins ambulatoires",
+    "Pharmacies",
+    "Total"
+  ),
+  friendly = c(
+    "assurance_maladie_privee",
+    "assurance_maladie_sociale",
+    "administration_sante_publique",
+    "services_administratifs",
+    "total",
+    "generaux",
+    "psychiatriques",
+    "specialises",
+    "cabinets_medicaux",
+    "centres_soins_ambulatoires",
+    "pharmacies",
+    "Depenses_sante"
+  ),
+  category = c(
+    "Admin","Admin","Admin","Admin",
+    "Hopitaux","Hopitaux","Hopitaux","Hopitaux",
+    "AmbuMedi","AmbuMedi","AmbuMedi",
+    "Totale"
+  )
+)
+
+mapping_Finance[,newname := paste0(category , "_" ,friendly)]
+
+finance_sante[, Fournisseur.de.soins.de.santé := mapping_Finance$newname[match(Fournisseur.de.soins.de.santé, mapping_Finance$original)]]
+
+finance_sante <- finance_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Fournisseur.de.soins.de.santé,Fonction.de.santé)]
+
+finance_sante_summary <- finance_sante[, 
+  .(mean_value = mean(OBS_VALUE,na.rm = TRUE)), 
+  by = .(REF_AREA, Measure, Unit.of.measure,Fournisseur.de.soins.de.santé)
 ]
 
+finance_sante_summary[, Tableau := "financement_sante"]
 
 
-dt_wide <- dcast(
-  dt_summary,
-  Reference.area ~ Tableau + Measure+ Unit.of.measure,
-  value.var = "median"
+finance_sante_wide <- dcast(
+  finance_sante_summary,
+  REF_AREA ~ Tableau + Measure+ Unit.of.measure + Fournisseur.de.soins.de.santé,
+  value.var = "mean_value"
 )
 
-setnames(dt_wide, gsub(" ", "_", names(dt_wide)))
+setnames(finance_sante_wide, gsub(" ", "_", names(finance_sante_wide)))
+
+save(finance_sante_wide, file = "../data/finance_sante_wide.RData")
 
 ```
 
-
-```{r}
-dim(dt_wide)
-```
-
-
-
-```{r}
-dt_wide
-```
-
-
-```{r}
-
-# Compter le nombre de NA par colonne
-na_count <- sapply(dt_wide, function(y) sum(is.na(y)))
-
-# Convertir en data.table pour avoir un résumé clair
-na_count_dt <- data.table(
-  variable = names(na_count),
-  na_count = na_count
-)
-
-# Nombre total de lignes (valeurs) par colonne
-na_count_dt[, total_count := nrow(dt_wide)]
-
-na_count_dt[, prop_na := na_count / total_count]
-
-na_count_dt
-```
-
-```{r}
-valid_indicators <- na_count_dt[prop_na < 0.15, as.character(variable)]
-valid_indicators
-```
 # 1) DEEP DIVE Mortalite evitable
 
-
 ```{r}
-Mortalite_evitable <- dt[Tableau == "Mortalite evitable"]
-Mortalite_evitable
-```
+Mortalite_evitable <- dt[Tableau == "Mortalite_evitable"]
 
-
-```{r}
-table(Mortalite_evitable$Measure)
-```
-
-
-```{r}
-table(Mortalite_evitable$Unit.of.measure)
-```
 
 ## Selection de Unit.of.measure
 
-```{r}
+
 
 Mortalite_evitable <- Mortalite_evitable[!(Unit.of.measure %in% c("deaths"))]
 
+Mortalite_evitable_summary <- Mortalite_evitable[, 
+  .(mean_value = mean(OBS_VALUE,na.rm = TRUE)
+    ), 
+  by = .(REF_AREA, Measure, Unit.of.measure)
+]
+
+Mortalite_evitable_summary[, Tableau := "Mortalite_evitable"]
+
+Mortalite_evitable_wide <- dcast(
+  Mortalite_evitable_summary,
+  REF_AREA ~Tableau + Measure+ Unit.of.measure,
+  value.var = "mean_value"
+)
+
+setnames(Mortalite_evitable_wide, gsub(" ", "_", names(Mortalite_evitable_wide)))
+
+save(Mortalite_evitable_wide, file = "../data/Mortalite_evitable_wide.RData")
 ```
 
-```{r}
-Mortalite_evitable
-```
-
-
-# 2) deep dive Ressources_Sante
+# 2) DEEP DIVE : Ressources_Sante
 
 ```{r}
 ressources_Sante <- dt[Tableau == "Ressources_Sante"]
-ressources_Sante
-```
-
-## summary pour compréhension des datas
-```{r}
-ressources_Sante[, list(moyenne = median(OBS_VALUE), maximum = max(OBS_VALUE), Tableau = Tableau), by = list(Reference.area, Measure, Unit.of.measure, Health.profession)]
-```
-
-
 
 ## Identification des modalité professions à conserver 
 
 ### sur le critè dont OBS_Value = 0 
 
-=> On peut enlever ça : pas informatif 
-```{r}
-ressources_Sante0 <- ressources_Sante[OBS_VALUE == 0]
-table(ressources_Sante0$Health.profession)
-```
-### Autres professions dont on se fiche (ex : autre spécialiste non classifié etc...)
 
-```{r}
-table(ressources_Sante$Health.profession)
-```
-
-```{r}
 ressources_Sante <- ressources_Sante[!(Health.profession %in% c("Medical doctors not further defined",
                                                                 "Other generalist (non-specialist) medical practitioners",
                                                                 "Other specialists not elsewhere classified",
@@ -198,16 +184,9 @@ ressources_Sante <- ressources_Sante[!(Health.profession %in% c("Medical doctors
                                                               ))]
 
 
-```
-
-
-
-
-
-
 ## Selection des unités de mesures standardisées ! 
 
-```{r}
+
 ressources_Sante <- ressources_Sante[!(Unit.of.measure %in% c("us_dollars_ppp_converted",
                                                               "us_dollars_exchange_rate_converted",
                                                               "percentage_of_workers_in_the_same_health_profession_and_sex",
@@ -219,39 +198,28 @@ ressources_Sante <- ressources_Sante[!(Unit.of.measure %in% c("us_dollars_ppp_co
                                                               "per_1000_practising_physicians_in_the_same_health_profession",
                                                               "persons"
                                                               ))]
-```
 
-## Création tableau ressources santé vezrsion wide 
+## Création tableau ressources santé vezrsion wide
 
-```{r}
 ressources_Sante_summary <- ressources_Sante[, 
-  .(moyenne = median(OBS_VALUE,na.rm = TRUE)), 
-  by = .(Reference.area, Measure, Unit.of.measure, Health.profession)
+  .(moyenne = mean(OBS_VALUE,na.rm = TRUE)), 
+  by = .(REF_AREA, Measure, Unit.of.measure, Health.profession)
 ]
 
-ressources_Sante_summary[, Tableau := "Ressources_Sante"]
+ressources_Sante_summary[, Tableau := "RH_Sante"]
 
-ressources_Sante_summary
-```
-
-
-```{r}
 ressources_Sante_wide <- dcast(
   ressources_Sante_summary,
-  Reference.area ~ Tableau + Measure + Health.profession  + Unit.of.measure,
+  REF_AREA ~ Tableau + Measure +Unit.of.measure + Health.profession,
   value.var = "moyenne"
 )
 
 setnames(ressources_Sante_wide, gsub(" ", "_", names(ressources_Sante_wide)))
-```
 
-```{r}
-ressources_Sante_wide
+save(ressources_Sante_wide, file = "../data/RH_Sante_wide.RData")
 ```
-
 
 ## NA count
-
 
 ```{r}
 # Compter le nombre de NA par colonne
@@ -271,53 +239,42 @@ na_count_dt[, prop_na := na_count / total_count]
 na_count_dt
 ```
 
+######################################################### 
 
+# 3) DEEP DIVE Qualite des soins
 
-
-
-#########################################################
-# 3) Deepdive Qualite des soins
-##########################################################
+######################################################### 
 
 ```{r}
-Qualite_des_soins <- ressources_Sante <- dt[Tableau == "Qualite des soins"]
-table(Qualite_des_soins$Unit.of.measure)
-```
+Qualite_des_soins <- ressources_Sante <- dt[Tableau == "Qualite_des_soins"]
+
+
 
 
 
 ## 1ére approche :  selection des indicateurs de mesure de la qualité des soins par tx de NA
 
 
-```{r}
-
-
-Qualite_des_soins_summary2 <- Qualite_des_soins[, 
+Qualite_des_soins_summary <- Qualite_des_soins[, 
   .(moyenne = median(OBS_VALUE,na.rm = TRUE)), 
-  by = .(Reference.area, Measure, Unit.of.measure)
+  by = .(REF_AREA, Measure, Unit.of.measure)
 ]
 
-Qualite_des_soins_summary2[, Tableau := "Qualite_des_soins"]
+Qualite_des_soins_summary[, Tableau := "Qualite_des_soins"]
 
-Qualite_des_soins_wide2 <- dcast(
-  Qualite_des_soins_summary2,
-  Reference.area ~ Tableau + Measure+ Unit.of.measure,
+Qualite_des_soins_wide <- dcast(
+  Qualite_des_soins_summary,
+  REF_AREA ~ Tableau + Measure+ Unit.of.measure,
   value.var = "moyenne"
 )
 
-setnames(Qualite_des_soins_wide2, gsub(" ", "_", names(Qualite_des_soins_wide2)))
+setnames(Qualite_des_soins_wide, gsub(" ", "_", names(Qualite_des_soins_wide)))
 
-```
-
-
-```{r}
-dim(Qualite_des_soins_wide2)
-```
 ### NA count
-```{r}
+
 
 # Compter le nombre de NA par colonne
-na_count <- sapply(Qualite_des_soins_wide2, function(y) sum(is.na(y)))
+na_count <- sapply(Qualite_des_soins_wide, function(y) sum(is.na(y)))
 
 # Convertir en data.table pour avoir un résumé clair
 na_count_dt <- data.table(
@@ -326,29 +283,15 @@ na_count_dt <- data.table(
 )
 
 # Nombre total de lignes (valeurs) par colonne
-na_count_dt[, total_count := nrow(Qualite_des_soins_wide2)]
+na_count_dt[, total_count := nrow(Qualite_des_soins_wide)]
 
 na_count_dt[, prop_na := na_count / total_count]
 
-na_count_dt
-```
-
-
-
-```{r}
 # Sélectionner uniquement les indicateurs avec moins de 25% de NA
 valid_indicators <- na_count_dt[prop_na < 0.25, as.character(variable)]
-valid_indicators
-```
 
-```{r}
-Qualite_des_soins_wide2 <- Qualite_des_soins_wide2[,..valid_indicators]
-Qualite_des_soins_wide2
-```
+Qualite_des_soins_wide <- Qualite_des_soins_wide[,..valid_indicators]
 
-## Mapping avec des noms user friendly 
-
-```{r}
 mapping_QS <- data.table(
   original = c(
     "Qualite_des_soins_acute_myocardial_infarction_30_day_mortality_during_same_hospital_admission_unlinked_data_per_100_admissions",
@@ -369,214 +312,647 @@ mapping_QS <- data.table(
     "Qualite_des_soins_volume_of_cephalosporines_and_quinolones_second_line_antibiotics_as_a_proportion_of_all_systemic_antibiotics_prescribed_percentage_of_defined_daily_doses_ddds_prescribed"
   ),
   friendly = c(
-    "Qualite_des_soins_Cadiac_crisis_30_day_mortality_same_hospital",
-    "Qualite_des_soins_Cadiac_crisis_30_day_mortality_in_out_hospital",
-    "Qualite_des_soins_Asthma_COPD_hospital_admission",
-    "Qualite_des_soins_Asthma_hospital_admission",
-    "Qualite_des_soins_COPD_hospital_admission",
-    "Qualite_des_soins_Congestive_Heart_Failure_hospital_admission",
-    "Qualite_des_soins_Congestive_Heart_Failure_Hypertension_hospital_admission",
-    "Qualite_des_soins_Hypertension_hospital_admission",
-    "Qualite_des_soins_Diabetic_lower_extremity_amputation",
-    "Qualite_des_soins_Diabetes_hospital_admission",
-    "Qualite_des_soins_Haemorrhagic_stroke_30_day_mortality",
-    "Qualite_des_soins_Ischaemic_stroke_30_day_mortality",
-    "Qualite_des_soins_Obstetric_trauma_vaginal_with_instrument",
-    "Qualite_des_soins_Obstetric_trauma_vaginal_without_instrument",
-    "Qualite_des_soins_Total_antibiotics_volume_DDD_per_1000_inhabitants",
-    "Qualite_des_soins_Second_line_antibiotics_proportion"
+    "Cadiac_crisis_30_day_mortality_same_hospital",
+    "Cadiac_crisis_30_day_mortality_in_out_hospital",
+    "Asthma_COPD_hospital_admission",
+    "Asthma_hospital_admission",
+    "COPD_hospital_admission",
+    "Congestive_Heart_Failure_hospital_admission",
+    "Congestive_Heart_Failure_Hypertension_hospital_admission",
+    "Hypertension_hospital_admission",
+    "Diabetic_lower_extremity_amputation",
+    "Diabetes_hospital_admission",
+    "Haemorrhagic_stroke_30_day_mortality",
+    "Ischaemic_stroke_30_day_mortality",
+    "Obstetric_trauma_vaginal_with_instrument",
+    "Obstetric_trauma_vaginal_without_instrument",
+    "Total_antibiotics_volume_DDD_per_1000_inhabitants",
+    "Second_line_antibiotics_proportion"
   ),
   category = c(
-    "Mortalité",
-    "Mortalité",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Hospitalisations_evitables",
-    "Mortalité",
-    "Mortalité",
-    "Sécurité_chirurgicale",
-    "Sécurité_chirurgicale",
-    "Médication",
-    "Médication"
+    "QS_Mortalité",
+    "QS_Mortalité",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Hospitalisations_evitables",
+    "QS_Mortalité",
+    "QS_Mortalité",
+    "QS_Sécurité_chirurgicale",
+    "QS_Sécurité_chirurgicale",
+    "QS_Médication",
+    "QS_Médication"
   )
 )
 
 # Combinaison friendly + catégorie
-mapping_QS[, newname := paste0(friendly, "_", category)]
+mapping_QS[, newname := paste0( category, "_", friendly)]
+
+setnames(Qualite_des_soins_wide, old = mapping_QS$original, new = mapping_QS$newname, skip_absent = TRUE)
+
+save(Qualite_des_soins_wide, file = "../data/Qualite_des_soins_wide.RData")
 
 ```
 
+# 4) DEEP DIVE : esperance de vie
+
 ```{r}
-setnames(Qualite_des_soins_wide2, old = mapping_QS$original, new = mapping_QS$newname)
+ dta_health <- readRDS("~/Code/World_health_data_proj/Data/dta_health.rds")
 ```
 
 ```{r}
-Qualite_des_soins_wide2
-```
-
-
-
-## 2ème approche :  selection des indicateurs de mesure de la qualité des soins par connaissance domaines 
-
-```{r}
-Qualite_des_soins <- ressources_Sante[!grepl("\\(Deprecated\\)", Measure)] # on enlève les indicateurs plus recommandé ni maintenu par l’OCDE (Deprecated)
-```
-
-
-###  Mortalité et réadmissions hospitalières
-
-Ces indicateurs mesurent l’efficacité et la sécurité clinique :
-
-"acute_myocardial_infarction_30_day_mortality_in_and_out_of_hospital_linked_data","haemorrhagic_stroke_30_day_mortality_in_and_out_of_hospital_linked_data","ischaemic_stroke_30_day_mortality_in_and_out_of_hospital_linked_data","congestive_heart_failure_allcause_mortality_within_365_days_after_discharge","congestive_heart_failure_allcause_hospital_readmissions_within_365_days_after_discharge"
-
-Justification : ces indicateurs reflètent la qualité des soins critiques et les risques liés aux traitements hospitaliers.
-
-####  Hospitalisations évitables / maladies chroniques
-
-Ces indicateurs traduisent la prévention, la coordination des soins et la qualité de la prise en charge :
-
-"asthma_hospital_admission","chronic_obstructive_pulmonary_disease_hospital_admission","diabetes_hospital_admission"
-
-Justification : les admissions pour maladies chroniques évitables signalent un suivi insuffisant ou des soins primaires inefficaces.
-
-###  Expérience et implication des patients
-
-Ces indicateurs mesurent la qualité relationnelle et la participation aux décisions de soins :
-
-"care_providers_involving_mental_health_patient_in_decisions_about_care_and_treatment_communitybased_care","care_providers_providing_easytounderstand_explanations_to_mental_health_patients_communitybased_care","care_providers_treating_mental_health_patients_with_courtesy_and_respect_communitybased_care","doctor_involving_patients_in_decisions_about_care_or_treatment","regular_doctor_giving_opportunity_to_ask_questions_or_raise_concerns"
-
-Justification : la communication et l’implication des patients sont des dimensions essentielles de la qualité des soins selon l’OMS et l’OCDE.
-
-###  Sécurité des procédures chirurgicales
-
-"hipfracture_surgery_initiated_within_2_days_of_hospital_admission","deep_vein_thrombosis_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data","pulmonary_embolism_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data","sepsis_following_abdominopelvic_surgery_within_30_days_of_surgery_linked_data"
-
-Justification : reflète la sécurité des soins chirurgicaux et le respect des bonnes pratiques.
-
-###  Éliminer
-
-Indicateurs financiers ou liés à l’usage de médicaments de masse (overall_volume_of_opioids_prescribed, total_volume_of_antibiotics_for_systemic_use_prescribed)
-
-Les indicateurs sur la prescription pour sous-populations spécifiques si l’objectif est la qualité générale (elderly_patients_with_prescription_of_longacting_benzodiazepines)
-
-
-
-
-```{r}
-mapping <- data.table(
-  original = c(
-    "acute_myocardial_infarction_30_day_mortality_in_and_out_of_hospital_linked_data",
-    "haemorrhagic_stroke_30_day_mortality_in_and_out_of_hospital_linked_data",
-    "ischaemic_stroke_30_day_mortality_in_and_out_of_hospital_linked_data",
-    "congestive_heart_failure_allcause_mortality_within_365_days_after_discharge",
-    "congestive_heart_failure_allcause_hospital_readmissions_within_365_days_after_discharge",
-    "asthma_hospital_admission",
-    "chronic_obstructive_pulmonary_disease_hospital_admission",
-    "diabetes_hospital_admission",
-    "care_providers_involving_mental_health_patient_in_decisions_about_care_and_treatment_communitybased_care",
-    "care_providers_providing_easytounderstand_explanations_to_mental_health_patients_communitybased_care",
-    "care_providers_treating_mental_health_patients_with_courtesy_and_respect_communitybased_care",
-    "doctor_involving_patients_in_decisions_about_care_or_treatment",
-    "regular_doctor_giving_opportunity_to_ask_questions_or_raise_concerns",
-    "hipfracture_surgery_initiated_within_2_days_of_hospital_admission",
-    "deep_vein_thrombosis_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data",
-    "pulmonary_embolism_following_hip_and_knee_replacement_within_30_days_of_surgery_linked_data",
-    "sepsis_following_abdominopelvic_surgery_within_30_days_of_surgery_linked_data",
-    "suicide_within_30_days_after_discharge_among_patients_diagnosed_with_a_mental_disorder"
-  ),
-  friendly = c(
-    "30_day_mortality_AMI",
-    "30_day_mortality_haemorrhagic_stroke",
-    "30_day_mortality_ischaemic_stroke",
-    "1yr_mortality_CHF",
-    "1yr_readmission_CHF",
-    "asthma_hospital_admission",
-    "COPD_hospital_admission",
-    "diabetes_hospital_admission",
-    "mental_health_patient_involvement_community",
-    "mental_health_clear_explanations_community",
-    "mental_health_courtesy_respect_community",
-    "doctor_patient_decision_involvement",
-    "regular_doctor_questions_opportunity",
-    "hip_fracture_surgery_within_2_days",
-    "DVT_post_hip_knee_30days",
-    "PE_post_hip_knee_30days",
-    "sepsis_post_abdominopelvic_30days",
-    "30_day_mortality_mental_disorder"
-  ),
-  category = c(
-    "Mortalite","Mortalite","Mortalite","Mortalite","Readmissions",
-    "Hospitalisations_evitables","Hospitalisations_evitables","Hospitalisations_evitables",
-    "Experience_patient","Experience_patient","Experience_patient","Experience_patient","Experience_patient",
-    "Sécurité_chirurgicale","Sécurité_chirurgicale","Sécurité_chirurgicale","Sécurité_chirurgicale","Mortalite"
-  )
-)
-
-# Construction du nouveau nom : friendly + catégorie
-mapping[, newname := paste0(friendly, "_", category)]
-```
-
-
-```{r}
-# Ajouter une nouvelle colonne combinant friendly + catégorie
-Qualite_des_soins[, Measure_friendly := mapping$friendly[match(Measure, mapping$original)]]
-Qualite_des_soins[, Measure_category := mapping$category[match(Measure, mapping$original)]]
-
-# Optionnel : concaténer friendly + catégorie dans une seule colonne
-Qualite_des_soins[, Measure := paste0( Measure_category , "_", Measure_friendly)]
+dta_health <- as.data.table(dta_health)
+dta_health
 ```
 
 ```{r}
-Qualite_des_soins <- Qualite_des_soins_mapped[Measure!= "NA_NA"]
+dta_health <- dta_health[TIME_PERIOD >=2015 & TIME_PERIOD <= 2020]
 ```
 
-
 ```{r}
-table(Qualite_des_soins_mapped$Measure)
-```
-### Selection des Unitées de mesures 
-
-
-```{r}
-table(Qualite_des_soins$Unit.of.measure, Qualite_des_soins$Measure  )
-```
-
-### Tableau Qualité des soins wide
-
-```{r}
-Qualite_des_soins_summary <- Qualite_des_soins[, 
+dta_health_summary <- dta_health[, 
   .(moyenne = median(OBS_VALUE,na.rm = TRUE)), 
-  by = .(Reference.area, Measure, Unit.of.measure)
+  by = .(REF_AREA, Measure, Unit.of.measure)
 ]
 
-Qualite_des_soins_summary[, Tableau := "Qualite_des_soins"]
+dta_health_summary[, Tableau := "life_expectancy"]
 
-Qualite_des_soins_summary
-```
-
-
-```{r}
-Qualite_des_soins_wide <- dcast(
-  Qualite_des_soins_summary,
-  Reference.area ~ Tableau + Measure+ Unit.of.measure,
+dta_health_wide <- dcast(
+  dta_health_summary,
+  REF_AREA ~ Tableau + Measure+ Unit.of.measure,
   value.var = "moyenne"
 )
 
-setnames(Qualite_des_soins_wide, gsub(" ", "_", names(Qualite_des_soins_wide)))
+setnames(dta_health_wide, gsub(" ", "_", names(dta_health_wide)))
 ```
 
+# MERGE ALL WIDE
 
 ```{r}
-Qualite_des_soins_wide
+dim(finance_sante_wide)
+dim(Mortalite_evitable_wide)
+dim(ressources_Sante_wide)
+dim(Qualite_des_soins_wide)
+dim(dta_health_wide)
 ```
 
+```{r}
+merged <- Reduce(function(x, y) merge(x, y, by = "REF_AREA", all = FALSE), list(finance_sante_wide, Mortalite_evitable_wide, ressources_Sante_wide,Qualite_des_soins_wide,dta_health_wide))
+
+names(merged) <- sub("financement_sante_depenses_pourcentage_des_depenses_de_sante_", "dep_sante_", names(merged))
+
+```
+
+```{r}
+# Compter le nombre de NA par colonne
+na_count <- sapply(merged, function(y) sum(is.na(y)))
+
+# Convertir en data.table pour avoir un résumé clair
+na_count_dt <- data.table(
+  variable = names(na_count),
+  na_count = na_count
+)
+
+# Nombre total de lignes (valeurs) par colonne
+na_count_dt[, total_count := nrow(merged)]
+
+na_count_dt[, prop_na := na_count / total_count]
 
 
+# Sélectionner uniquement les indicateurs avec moins de 25% de NA
+valid_indicators <- na_count_dt[prop_na < 0.25, as.character(variable)]
+
+merged <- merged[,..valid_indicators]
 
 
+# Estimation du nombre de composantes à retenir pour l'ACP
 
+ncomposantes <- estim_ncpPCA(merged[,2:77]) 
+
+# Imputation des données manquantes en utilisant une ACP
+
+resultat_imputation <- imputePCA(merged[,2:77], ncp = 2) 
+
+merged_inputed <- data.table(resultat_imputation$completeObs)
+
+merged_inputed[,REF_AREA := merged[,1]]
+
+setcolorder(merged_inputed, c("REF_AREA", names(merged_inputed)[names(merged_inputed) != "REF_AREA"]))  # placer 'REF_AREA' en premier
+```
+
+```{r}
+var_map <- list(
+  REF_AREA = "area",
+  dep_sante_Admin_administration_sante_publique = "dep_admin_pub",
+  dep_sante_Admin_services_administratifs = "dep_admin_serv",
+  dep_sante_AmbuMedi_cabinets_medicaux = "dep_cab_med",
+  dep_sante_AmbuMedi_centres_soins_ambulatoires = "dep_centre_amb",
+  dep_sante_AmbuMedi_pharmacies = "dep_pharma",
+  dep_sante_Hopitaux_generaux = "dep_hosp_gen",
+  dep_sante_Hopitaux_psychiatriques = "dep_hosp_psy",
+  dep_sante_Hopitaux_specialises = "dep_hosp_spec",
+  dep_sante_Hopitaux_total = "dep_hosp_tot",
+  dep_sante_Totale_Depenses_sante = "dep_tot_sante",
+  financement_sante_depenses_pourcentage_du_pib_Admin_administration_sante_publique = "pib_admin_pub",
+  financement_sante_depenses_pourcentage_du_pib_Admin_services_administratifs = "pib_admin_serv",
+  financement_sante_depenses_pourcentage_du_pib_AmbuMedi_cabinets_medicaux = "pib_cab_med",
+  financement_sante_depenses_pourcentage_du_pib_AmbuMedi_centres_soins_ambulatoires = "pib_centre_amb",
+  financement_sante_depenses_pourcentage_du_pib_AmbuMedi_pharmacies = "pib_pharma",
+  financement_sante_depenses_pourcentage_du_pib_Hopitaux_generaux = "pib_hosp_gen",
+  financement_sante_depenses_pourcentage_du_pib_Hopitaux_psychiatriques = "pib_hosp_psy",
+  financement_sante_depenses_pourcentage_du_pib_Hopitaux_total = "pib_hosp_tot",
+  financement_sante_depenses_pourcentage_du_pib_Totale_Depenses_sante = "pib_sante_tot",
+  Mortalite_evitable_avoidable_mortality_deaths_per_100_000_inhabitants = "mort_avoid",
+  Mortalite_evitable_preventable_mortality_deaths_per_100_000_inhabitants = "mort_prev",
+  Mortalite_evitable_treatable_mortality_deaths_per_100_000_inhabitants = "mort_treat",
+  RH_Sante_annual_income_factor_of_average_annual_wage_General_practitioners = "rev_gp_wage",
+  RH_Sante_annual_income_factor_of_average_annual_wage_Hospital_nurses = "rev_nurse_wage",
+  RH_Sante_annual_income_factor_of_average_annual_wage_Specialist_medical_practitioners = "rev_spec_wage",
+  RH_Sante_annual_income_factor_of_gdp_per_capita_General_practitioners = "rev_gp_gdp",
+  RH_Sante_annual_income_factor_of_gdp_per_capita_Hospital_nurses = "rev_nurse_gdp",
+  RH_Sante_annual_income_factor_of_gdp_per_capita_Specialist_medical_practitioners = "rev_spec_gdp",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Caring_personnel = "emp_care",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Dentists = "emp_dent",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_General_paediatricians = "emp_ped",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_General_practitioners = "emp_gp",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Generalist_medical_practitioners = "emp_gen_med",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Human_health_and_social_work_activities = "emp_soc",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Medical_group_of_specialists = "emp_spec_grp",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Midwifes = "emp_mid",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Obstetricians_and_gynaecologists = "emp_gyne",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Pharmacists = "emp_pharma",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Physiotherapists = "emp_physio",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Professional_nurses = "emp_nurse",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Psychiatrists = "emp_psy",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Specialist_medical_practitioners = "emp_spec",
+  RH_Sante_health_and_social_employment_per_1_000_inhabitants_Surgical_group_of_specialists = "emp_surg",
+  RH_Sante_health_and_social_employment_per_1_000_live_births_Midwifes = "emp_mid_birth",
+  RH_Sante_health_and_social_employment_per_1_000_live_births_Obstetricians_and_gynaecologists = "emp_gyne_birth",
+  RH_Sante_health_and_social_employment_percentage_of_employment_Human_health_and_social_work_activities = "pct_emp_soc",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_General_paediatricians = "pct_ped",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_General_practitioners = "pct_gp",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Generalist_medical_practitioners = "pct_gen_med",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Medical_group_of_specialists = "pct_spec_grp",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Obstetricians_and_gynaecologists = "pct_gyne",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Psychiatrists = "pct_psy",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Specialist_medical_practitioners = "pct_spec",
+  RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Surgical_group_of_specialists = "pct_surg",
+  RH_Sante_health_graduates_per_100_000_inhabitants_Dentists = "grad_dent",
+  RH_Sante_health_graduates_per_100_000_inhabitants_Midwifes = "grad_mid",
+  RH_Sante_health_graduates_per_100_000_inhabitants_Pharmacists = "grad_pharma",
+  RH_Sante_health_graduates_per_100_000_inhabitants_Professional_nurses = "grad_nurse",
+  RH_Sante_hospital_employment_per_1_000_inhabitants_Other_health_service_providers = "hosp_emp_other",
+  RH_Sante_hospital_employment_per_1_000_inhabitants_Professional_nurses_and_midwives = "hosp_emp_nurse_mid",
+  RH_Sante_hospital_employment_per_1_000_inhabitants_Total = "hosp_emp_tot",
+  RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers = "pct_hosp_other",
+  RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives = "pct_hosp_nurse_mid",
+  QS_Mortalité_Cadiac_crisis_30_day_mortality_same_hospital = "qs_mort_cardio",
+  QS_Hospitalisations_evitables_Asthma_COPD_hospital_admission = "qs_hosp_asthma_copd",
+  QS_Hospitalisations_evitables_Asthma_hospital_admission = "qs_hosp_asthma",
+  QS_Hospitalisations_evitables_COPD_hospital_admission = "qs_hosp_copd",
+  QS_Hospitalisations_evitables_Congestive_Heart_Failure_hospital_admission = "qs_hosp_chf",
+  QS_Hospitalisations_evitables_Congestive_Heart_Failure_Hypertension_hospital_admission = "qs_hosp_chf_htn",
+  QS_Hospitalisations_evitables_Hypertension_hospital_admission = "qs_hosp_htn",
+  QS_Hospitalisations_evitables_Diabetic_lower_extremity_amputation = "qs_amput_diab",
+  QS_Hospitalisations_evitables_Diabetes_hospital_admission = "qs_hosp_diab",
+  QS_Mortalité_Haemorrhagic_stroke_30_day_mortality = "qs_mort_h_stroke",
+  QS_Mortalité_Ischaemic_stroke_30_day_mortality = "qs_mort_i_stroke",
+  QS_Médication_Second_line_antibiotics_proportion = "qs_abx_2nd"
+)
+
+```
+
+```{r}
+names(merged_inputed)
+```
+
+```{r}
+old_names <- names(merged_inputed)
+new_names <- sapply(old_names, function(x) if (x %in% names(dict)) dict[[x]] else x)
+setnames(merged_inputed, old = old_names, new = new_names)
+```
+
+```{r}
+merged_inputed
+```
+
+```{r}
+vars <- c("dep_sante_Totale_Depenses_sante","RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers","RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives","QS_Médication_Second_line_antibiotics_proportion")
+dt_excl <- copy(merged_inputed[, .SD, .SDcols = setdiff(names(merged_inputed), vars)])
+```
+
+```{r}
+
+save(dt_excl, file = "../data/merged_inputed.RData")
+```
+
+```{r}
+names(dt_excl)
+```
+
+```{r}
+dict <- data.table(
+  var_full = c(
+    "REF_AREA",
+    # Dépenses de santé
+    "dep_sante_Admin_administration_sante_publique",
+    "dep_sante_Admin_services_administratifs",
+    "dep_sante_AmbuMedi_cabinets_medicaux",
+    "dep_sante_AmbuMedi_centres_soins_ambulatoires",
+    "dep_sante_AmbuMedi_pharmacies",
+    "dep_sante_Hopitaux_generaux",
+    "dep_sante_Hopitaux_psychiatriques",
+    "dep_sante_Hopitaux_specialises",
+    "dep_sante_Hopitaux_total",
+    #"dep_sante_Totale_Depenses_sante",
+    # Financement / PIB
+    "financement_sante_depenses_pourcentage_du_pib_Admin_administration_sante_publique",
+    "financement_sante_depenses_pourcentage_du_pib_Admin_services_administratifs",
+    "financement_sante_depenses_pourcentage_du_pib_AmbuMedi_cabinets_medicaux",
+    "financement_sante_depenses_pourcentage_du_pib_AmbuMedi_centres_soins_ambulatoires",
+    "financement_sante_depenses_pourcentage_du_pib_AmbuMedi_pharmacies",
+    "financement_sante_depenses_pourcentage_du_pib_Hopitaux_generaux",
+    "financement_sante_depenses_pourcentage_du_pib_Hopitaux_psychiatriques",
+    "financement_sante_depenses_pourcentage_du_pib_Hopitaux_total",
+    "financement_sante_depenses_pourcentage_du_pib_Totale_Depenses_sante",
+    # Mortalité évitable
+    "Mortalite_evitable_avoidable_mortality_deaths_per_100_000_inhabitants",
+    "Mortalite_evitable_preventable_mortality_deaths_per_100_000_inhabitants",
+    "Mortalite_evitable_treatable_mortality_deaths_per_100_000_inhabitants",
+    # Revenus RH santé
+    "RH_Sante_annual_income_factor_of_average_annual_wage_General_practitioners",
+    "RH_Sante_annual_income_factor_of_average_annual_wage_Hospital_nurses",
+    "RH_Sante_annual_income_factor_of_average_annual_wage_Specialist_medical_practitioners",
+    "RH_Sante_annual_income_factor_of_gdp_per_capita_General_practitioners",
+    "RH_Sante_annual_income_factor_of_gdp_per_capita_Hospital_nurses",
+    "RH_Sante_annual_income_factor_of_gdp_per_capita_Specialist_medical_practitioners",
+    # Emploi RH santé
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Caring_personnel",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Dentists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_General_paediatricians",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_General_practitioners",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Generalist_medical_practitioners",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Human_health_and_social_work_activities",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Medical_group_of_specialists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Midwifes",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Obstetricians_and_gynaecologists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Pharmacists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Physiotherapists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Professional_nurses",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Psychiatrists",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Specialist_medical_practitioners",
+    "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Surgical_group_of_specialists",
+    "RH_Sante_health_and_social_employment_per_1_000_live_births_Midwifes",
+    "RH_Sante_health_and_social_employment_per_1_000_live_births_Obstetricians_and_gynaecologists",
+    # Pourcentage emploi RH
+    "RH_Sante_health_and_social_employment_percentage_of_employment_Human_health_and_social_work_activities",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_General_paediatricians",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_General_practitioners",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Generalist_medical_practitioners",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Medical_group_of_specialists",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Obstetricians_and_gynaecologists",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Psychiatrists",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Specialist_medical_practitioners",
+    "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_Surgical_group_of_specialists",
+    # Diplômés santé
+    "RH_Sante_health_graduates_per_100_000_inhabitants_Dentists",
+    "RH_Sante_health_graduates_per_100_000_inhabitants_Midwifes",
+    "RH_Sante_health_graduates_per_100_000_inhabitants_Pharmacists",
+    "RH_Sante_health_graduates_per_100_000_inhabitants_Professional_nurses",
+    # Emploi hospitalier
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Other_health_service_providers",
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Professional_nurses_and_midwives",
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Total",
+    #"RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers",
+    #"RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives",
+    # Qualité / sécurité (QS)
+    "QS_Mortalité_Cadiac_crisis_30_day_mortality_same_hospital",
+    "QS_Hospitalisations_evitables_Asthma_COPD_hospital_admission",
+    "QS_Hospitalisations_evitables_Asthma_hospital_admission",
+    "QS_Hospitalisations_evitables_COPD_hospital_admission",
+    "QS_Hospitalisations_evitables_Congestive_Heart_Failure_hospital_admission",
+    "QS_Hospitalisations_evitables_Congestive_Heart_Failure_Hypertension_hospital_admission",
+    "QS_Hospitalisations_evitables_Hypertension_hospital_admission",
+    "QS_Hospitalisations_evitables_Diabetic_lower_extremity_amputation",
+    "QS_Hospitalisations_evitables_Diabetes_hospital_admission",
+    "QS_Mortalité_Haemorrhagic_stroke_30_day_mortality",
+    "QS_Mortalité_Ischaemic_stroke_30_day_mortality",
+    #"QS_Médication_Second_line_antibiotics_proportion",
+    "life_expectancy_Life_expectancy_Years"
+  )
+)
+
+# Codes courts
+dict[, var_code := c(
+  "area", "dep_admin_pub", "dep_admin_serv", "dep_cab_med", "dep_centre_amb",
+  "dep_pharma", "dep_hosp_gen", "dep_hosp_psy", "dep_hosp_spec", "dep_hosp_tot",
+  "pib_admin_pub", "pib_admin_serv", "pib_cab_med", "pib_centre_amb",
+  "pib_pharma", "pib_hosp_gen", "pib_hosp_psy", "pib_hosp_tot", "pib_sante_tot",
+  "mort_avoid", "mort_prev", "mort_treat", "rev_gp_wage", "rev_nurse_wage",
+  "rev_spec_wage", "rev_gp_gdp", "rev_nurse_gdp", "rev_spec_gdp", "emp_care",
+  "emp_dent", "emp_ped", "emp_gp", "emp_gen_med", "emp_soc", "emp_spec_grp",
+  "emp_mid", "emp_gyne", "emp_pharma", "emp_physio", "emp_nurse", "emp_psy",
+  "emp_spec", "emp_surg", "emp_mid_birth", "emp_gyne_birth", "pct_emp_soc",
+  "pct_ped", "pct_gp", "pct_gen_med", "pct_spec_grp", "pct_gyne", "pct_psy",
+  "pct_spec", "pct_surg", "grad_dent", "grad_mid", "grad_pharma", "grad_nurse",
+  "hosp_emp_other", "hosp_emp_nurse_mid", "hosp_emp_tot", "qs_mort_cardio", "qs_hosp_asthma_copd", "qs_hosp_asthma",
+  "qs_hosp_copd", "qs_hosp_chf", "qs_hosp_chf_htn", "qs_hosp_htn", "qs_amput_diab",
+  "qs_hosp_diab", "qs_mort_h_stroke", "qs_mort_i_stroke", "life_expectancy"
+)]
+```
+
+```{r}
+dict
+```
+
+```{r}
+# Attribution des groupes
+dict[, var_group := fifelse(grepl("^dep_sante", var_full), "Dépenses en % du total des dépenses de santé",
+                     fifelse(grepl("^financement_sante", var_full), "Dépenses de santé en % du PIB du pays",
+                     fifelse(grepl("^Mortalite_evitable", var_full), "Mortalité évitable",
+                     fifelse(grepl("income_factor_of_average_annual_wage", var_full), "Revenus professionels de la santé (vs salaire moyen)",
+                     fifelse(grepl("income_factor_of_gdp_per_capita", var_full), "Revenus professionels de la santé (vs PIB/habitant)",
+                     #fifelse(grepl("hospital_employment", var_full), "Emploi hospitalier",
+                     fifelse(grepl("employment", var_full), "Emploi en santé pour 1000 habitants",
+                     fifelse(grepl("graduates", var_full), "Diplômés santé pour 100 000 habitants",
+                     fifelse(grepl("^QS_Hospitalisations_evitables", var_full), "Hospitalisations évitables pour 1000 patients",
+                     fifelse(grepl("^QS_Mortalité", var_full), "Morts en hopital pour 1000 patients",
+                     fifelse(grepl("^QS_Médication", var_full), "antibio de 2nd ligne en hopital pour 1000 patients",
+                     fifelse(grepl("^life_expectancy", var_full), "esperance de vie", 
+                     NA_character_)))))))))))]
+
+# Libellés lisibles
+dict[, var_label := gsub("_", " ", var_code)]
+
+```
+
+```{r}
+dict[, var_label_fr := c(
+  "REF_AREA",
+  # Dépenses en % du total
+  "% alloué à l'admin santé publique", 
+  "% alloué aux Services admin santé", 
+  "% alloué aux Cabinets médicaux", 
+  "% alloué aux Centres soins ambulatoires", 
+  "% alloué aux Pharmacies", 
+  "% alloué aux Hôpitaux généraux", 
+  "% alloué aux Hôpitaux psychiatriques", 
+  "% alloué aux Hôpitaux spécialisés", 
+  "% alloué aux Total hôpitaux", 
+  #"% alloué aux Dépenses totales santé",         # a tej
+  # Dépenses % PIB
+  "dep Admin santé en % du PIB", 
+  "dep Services admin en % du PIB", 
+  "dep Cabinets médicaux en % du PIB", 
+  "dep Centres soins ambulatoires en % du PIB", 
+  "dep Pharmacies en % du PIB", 
+  "dep Hôpitaux généraux en % du PIB", 
+  "dep Hôpitaux psychiatriques en % du PIB", 
+  "dep Hôpitaux totaux en % du PIB", 
+  "dep Total santé en % du PIB",
+  # Mortalité évitable
+  "Mortalité évitable globale", 
+  "Mortalité évitable par mesure préventive", 
+  "Mortalité évitable avec traitement adapté",
+  # Revenus RH (vs salaire moyen)
+  "Salaire med généralistes/salaire moyen", 
+  "Salaire infirmiers/salaire moyen", 
+  "Salaire spécialistes/salaire moyen",
+  # Revenus RH (vs PIB/hab)
+  "Salaire med généralistes / PIB/hab", 
+  "Salaire infirmiers / PIB/hab", 
+  "Salaire spécialistes / PIB/hab",
+  # Emploi RH santé
+  "nbr Personnel soignant/1000 hab", 
+  "nbr Dentistes/1000 hab", 
+  "nbr Pédiatres généraux/1000 hab", 
+  "nbr Médecins généralistes/1000 hab", 
+  "nbr Médecins spécialisés/1000 hab", 
+  "nbr Travail social et santé/1000 hab", 
+  "nbr Groupement spécialistes médicaux/1000 hab", 
+  "nbr Sages-femmes/1000 hab", 
+  "nbr Obstétriciens/Gynécologues/1000 hab", 
+  "nbr Pharmaciens/1000 hab", 
+  "nbr Kinésithérapeutes/1000 hab", 
+  "nbr Infirmiers professionnels/1000 hab", 
+  "nbr Psychiatres/1000 hab", 
+  "nbr Spécialistes médicaux/1000 hab", 
+  "nbr Chirurgiens spécialistes/1000 hab", 
+  "nbr Sages-femmes /1000 naissances", 
+  "nbr Obstétriciens/Gynéco/1000 naissances",
+  # % emploi RH
+  "% emploi travail social parmis les travailleurs de la santé", 
+  "% pédiatres parmis les travailleurs de la santé", 
+  "% médecins spécialistes parmis les travailleurs de la santé", 
+  "% médecins généralistes parmis les travailleurs de la santé", 
+  "% groupe spécialistes parmis les travailleurs de la santé", 
+  "% gynéco parmis les travailleurs de la santé", 
+  "% psychiatres parmis les travailleurs de la santé", 
+  "% spécialistes parmis les travailleurs de la santé", 
+  "% chirurgiens parmis les travailleurs de la santé",
+  # Diplômés
+  "Dentistes diplômés/100 000 hab", 
+  "Sages-femmes diplômées/100 000 hab", 
+  "Pharmaciens diplômés/100 000 hab", 
+  "Infirmiers diplômés/100 000 hab",
+  # Emploi hospitalier
+  "nbr Autres prestataires hospitaliers/1000 hab", 
+  "nbr Infirmiers/sages-femmes hôpital/1000 hab",  
+  "nbr total employés dans l'hôpital/1000 hab",                    
+  # Qualité & Sécurité
+  "Mortalité cardio 30j/100 admissions", 
+  "Hospitalisations évitables Asthme ou BPCO/100 000 hab", 
+  "Hospitalisations évitables Asthme/100 000 hab", 
+  "Hospitalisations évitables pour BPCO/100 000 hab", 
+  "Hospitalisations évitables insu.card/100 000 hab", 
+  "Hospitalisations évitables pour insu.card+hypertension/ 100 000 hab", 
+  "Hospitalisations évitables pour hypertension/100 000 hab", 
+  "Amputations de peronnes diabètiques/100 000 hab", 
+  "Hospitalisation de peronnes diabètiques/100 000 hab", 
+  "Mortalité AVC hémorragique 30j/100 admissions", 
+  "Mortalité AVC ischémique 30j/100 admissions", 
+  "Esperance de vie (années)"
+)]
+
+```
+
+```{r}
+Labels_dict_wide <- dict
+save(Labels_dict_wide, file = "../data/Labels_dict_wide.RData")
+```
+
+```{r}
+setnames(merged_inputed, old = dict$var_full, new = dict$var_label_fr)
+```
+
+```{r}
+merged_inputed
+```
+
+```{r}
+library(data.table)
+library(dplyr)
+
+# --- 1. Définir les groupes thématiques ----
+```
+
+```{r}
+vars_groupes <- list(
+  mortalite_evitable = c(
+    "Mortalité évitable globale",
+    "Mortalité évitable par mesure préventive",
+    "Mortalité évitable avec traitement adapté"
+  ),
+
+  
+  ressources_humaines = c(
+    "nbr Personnel soignant/1000 hab",
+    "nbr Dentistes/1000 hab",
+    "nbr Pédiatres généraux/1000 hab",
+    "nbr Médecins généralistes/1000 hab",
+    "nbr Médecins spécialisés/1000 hab",
+    "nbr Travail social et santé/1000 hab",
+    "nbr Groupement spécialistes médicaux/1000 hab",
+    "nbr Sages-femmes/1000 hab",
+    "nbr Obstétriciens/Gynécologues/1000 hab",
+    "nbr Pharmaciens/1000 hab",
+    "nbr Kinésithérapeutes/1000 hab",
+    "nbr Infirmiers professionnels/1000 hab",
+    "nbr Psychiatres/1000 hab",
+    "nbr Spécialistes médicaux/1000 hab",
+    "nbr Chirurgiens spécialistes/1000 hab",
+    "nbr Sages-femmes /1000 naissances",
+    "nbr Obstétriciens/Gynéco/1000 naissances",
+    "nbr Autres prestataires hospitaliers/1000 hab",
+    "nbr Infirmiers/sages-femmes hôpital/1000 hab",
+    "nbr total employés dans l'hôpital/1000 hab"
+  ),
+  
+  qualite_soins = c(
+    "Mortalité cardio 30j/100 admissions",
+    "Hospitalisations évitables Asthme ou BPCO/100 000 hab",
+    "Hospitalisations évitables Asthme/100 000 hab",
+    "Hospitalisations évitables pour BPCO/100 000 hab",
+    "Hospitalisations évitables insu.card/100 000 hab",
+    "Hospitalisations évitables pour insu.card+hypertension/ 100 000 hab",
+    "Hospitalisations évitables pour hypertension/100 000 hab",
+    "Amputations de peronnes diabètiques/100 000 hab",
+    "Hospitalisation de peronnes diabètiques/100 000 hab",
+    "Mortalité AVC hémorragique 30j/100 admissions",
+    "Mortalité AVC ischémique 30j/100 admissions"
+  ),
+  
+  esperance_de_vie = c("Esperance de vie (années)")
+)
+```
+
+```{r}
+save(vars_groupes, file = "../data/vars_groupes_scores.RData")
+```
+
+```{r}
+names(vars_groupes)
+```
+
+```{r}
+# --- 2. Définir si chaque groupe est à maximiser ou minimiser ----
+# TRUE = plus c’est haut, mieux c’est ; FALSE = plus c’est bas, mieux c’est
+
+orientation <- list(
+  mortalite_evitable = FALSE,
+  ressources_humaines = TRUE,
+  qualite_soins = FALSE,
+  esperance_de_vie = TRUE
+)
+```
+
+# --- 3
+
+$$
+\tilde{x}{ij} =
+\begin{cases}
+\frac{x{ij} - \min(\mathbf{x}_j)}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à maximiser}, 
+\frac{\max(\mathbf{x}j) - x{ij}}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à minimiser.}
+\end{cases}
+$$ Ainsi, toutes les variables normalisées sont dans l'intervalle \[0,1\] et un score plus élevé est toujours préférable. Si un groupe g contient pg​ variables, le score du pays i pour ce groupe est la moyenne des variables normalisées dans le groupe : $$
+S_i(g) = \frac{1}{p_g} \sum_{j \in g} \tilde{x}_{ij}
+$$ où j∈g parcourt les variables appartenant au groupe g . Si on a G groupes de variables, chaque groupe g pouvant avoir un poids wg​ (par défaut, poids égaux si non spécifiés), le score global du pays i est calculé comme suit :
+
+$$
+S_{i}^{\text{global}} = \frac{\sum_{g=1}^G w_g , S_i(g)}{\sum_{g=1}^G w_g}
+$$
+
+Dans le cas où tous les groupes ont le même poids, la formule se simplifie en : $$
+S_{i}^{\text{global}} = \frac{1}{G} \sum_{g=1}^G S_i(g)
+$$
+
+```{r}
+normalize_dir <- function(x, maximize = TRUE) {
+  if (all(is.na(x))) return(rep(NA, length(x)))
+  rng <- range(x, na.rm = TRUE)
+  if (diff(rng) == 0) return(rep(0.5, length(x))) 
+  if (maximize) {
+    (x - rng[1]) / diff(rng)
+  } else {
+    1 - (x - rng[1]) / diff(rng)
+  }
+}
+
+
+calc_score_global <- function(dt, id_col = "REF_AREA") {
+  scores_groupes <- list()
+  
+  for (g in names(vars_groupes)) {
+    vars <- vars_groupes[[g]]
+    maximize <- orientation[[g]]
+    maximize_vec <- rep(maximize, length(vars))
+    dt_norm <- dt[, c(id_col, vars), with = FALSE]
+    
+    dt_norm[, (vars) := lapply(seq_along(vars), function(i)
+      normalize_dir(.SD[[i]], maximize_vec[i])
+    ), .SDcols = vars]
+    
+    dt_norm[, score_groupe := rowMeans(.SD, na.rm = TRUE), .SDcols = vars]
+    
+    scores_groupes[[g]] <- dt_norm[, .(get(id_col), score_groupe)]
+    setnames(scores_groupes[[g]], c("V1", "score_groupe"), c(id_col, g))
+  }
+  
+  scores_global <- Reduce(function(x, y) merge(x, y, by = id_col, all = TRUE), scores_groupes)
+  scores_global[, score_global := rowMeans(.SD, na.rm = TRUE), .SDcols = names(vars_groupes)]
+  
+  return(scores_global)
+}
+```
+
+```{r}
+scores <- calc_score_global(merged_inputed)
+
+```
+
+```{r}
+print(names(scores))
+```
+
+```{r}
+save(scores, file = "../data/scores_global.RData")
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(scores, aes(x = reorder(REF_AREA, score_global), y = score_global)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    x = "Pays",
+    y = "Score global de performance sanitaire (0–1)",
+    title = "Comparaison internationale des systèmes de santé",
+    subtitle = "Score composite pondéré par groupes d’indicateurs"
+  ) +
+  theme_minimal(base_size = 13)
+```

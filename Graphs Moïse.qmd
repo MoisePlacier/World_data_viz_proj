@@ -1,0 +1,111 @@
+---
+title: "Graphs Moïse"
+format: html
+editor: visual
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+```
+
+
+```{r}
+obj_name <- load("data/merged_inputed.RData")
+
+dt <- as.data.table(get(obj_name))
+
+dt$REF_AREA <- as.factor(dt$REF_AREA)
+
+obj_name2 <- load("data/Labels_dict_wide.RData")
+
+dict <- as.data.table(get(obj_name2))
+```
+
+```{r}
+url <- "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson"
+geo_sf <- st_read(url)
+```
+```{r}
+library(rnaturalearth)
+library(sf)
+
+geo_sf <- ne_countries(scale = "medium", returnclass = "sf")
+geo_sf <- as.data.table(geo_sf)
+geo_sf$gu_a3
+```
+
+```{r}
+filtre <- dt$REF_AREA
+geo_sf <- geo_sf[(gu_a3 %in% filtre)]
+geo_sf
+```
+
+
+```{r}
+setnames(dt, old = dict$var_label_fr, new = dict$var_code)
+```
+
+```{r}
+dt$area
+```
+
+
+```{r}
+dict
+```
+
+
+```{r}
+var_grouptest <- dict[2,3]
+var_grouptest
+```
+
+
+```{r}
+vars_in_group <- dict[var_group == var_grouptest, var_label_fr,var_full]
+vars_in_group
+```
+
+
+```{r}
+cosine_sim <- function(x, y) {
+  sum(x * y) / (sqrt(sum(x^2)) * sqrt(sum(y^2)))
+}
+
+calc_similarity <- function(dt, selected_country, vars) {
+  dt_scaled <- copy(dt)
+  dt_scaled[, (vars) := lapply(.SD, scale), .SDcols = vars]
+  x_ref <- as.numeric(dt_scaled[REF_AREA == selected_country, ..vars])
+  sims <- dt_scaled[, .(REF_AREA, sim = apply(.SD, 1, function(y) cosine_sim(x_ref, as.numeric(y)))), .SDcols = vars]
+  sims[]
+}
+```
+
+```{r}
+dt
+```
+
+```{r}
+obj_name2 <- load("../Data/Labels_dict_wide.RData")
+dict <- as.data.table(get(obj_name2))
+
+```
+
+```{r}
+var_grouptest <- dict[2,3]
+vars <- dict[var_group == var_grouptest, var_full]
+vars <- vars[sapply(dt[, ..vars], function(x) sd(x) != 0)]
+#sims <- calc_similarity(dt, "FRA", vars)
+```
+
+```{r}
+dt_scaled <- copy(dt)
+dt_scaled[, (vars) := lapply(.SD, scale), .SDcols = vars]
+x_ref <- as.numeric(dt_scaled[REF_AREA == "AUS", ..vars])
+```
+
+```{r}
+x_ref
+```
+

@@ -16,8 +16,16 @@ dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
 dta_RH_sante <- readRDS("../data/dta_RH_sante.rds")
 dta_qualite_soins <- readRDS("../data/dta_qualite_soins.rds")
 dta_agri <- readRDS("../data/dta_agri.rds")
+dta_finance <- read.csv("../data/Raw_Financement_health.csv")
 
 ```
+
+
+
+```{r}
+table(dta_medicament$Measure)
+```
+
 
 ```{r}
 library(data.table)
@@ -32,14 +40,18 @@ dta_mortalite_evitable <- data.table(dta_mortalite_evitable)
 dta_RH_sante <- data.table(dta_RH_sante)
 dta_qualite_soins <- data.table(dta_qualite_soins)
 dta_agri <- data.table(dta_agri)
+dta_finance <- data.table(dta_finance)
+```
+```{r}
+dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
+table(dta_mortalite_evitable$Measure)
 ```
 
+
 ```{r}
-summary(dta_qualite_soins)
+dta_finance
 ```
-```{r}
-dta_RH_sante
-```
+
 
 ```{r}
 table(dta_RH_sante$Health.profession, dta_RH_sante$Unit.of.measure)
@@ -48,7 +60,6 @@ table(dta_RH_sante$Health.profession, dta_RH_sante$Unit.of.measure)
 Cleaning des données
 
 ```{r}
-
 dta_health <- dta_health[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VALUE,Unit.of.measure)]
 dta_health <- dta_health[, Tableau := "Health"]
 
@@ -59,21 +70,33 @@ dta_pib_hab <- dta_pib_hab[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,OBS_VA
 dta_pib_hab <- dta_pib_hab[, Tableau := "PIB par Habitant"]
 
 dta_pib_sante <- dta_pib_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_pib_sante <- dta_pib_sante[, Tableau := "PIB sante"]
+dta_pib_sante <- dta_pib_sante[, Tableau := "PIB_sante"]
 
 dta_air_quality <- dta_air_quality[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_air_quality <- dta_air_quality[, Tableau := "Exposition pollution"]
+dta_air_quality <- dta_air_quality[, Tableau := "Exposition_pollution"]
 
 dta_qualite_soins <- dta_qualite_soins[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_qualite_soins <- dta_qualite_soins[, Tableau := "Qualite des soins"]
+dta_qualite_soins <- dta_qualite_soins[, Tableau := "Qualite_des_soins"]
 
 dta_medicament <- dta_medicament[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_medicament <- dta_medicament[, Tableau := "Medicament"]
 
 dta_mortalite_evitable <- dta_mortalite_evitable[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
-dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite evitable"]
+dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite_evitable"]
+```
+
+```{r}
+dta_mortalite_evitable
+```
 
 
+```{r}
+dta_mortalite_evitable[Reference.area=="Bulgaria" & TIME_PERIOD == 2017 & Measure == "treatable_mortality"]
+```
+
+
+
+```{r}
 dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
 dta_agri <- dta_agri[, Tableau := "Agriculture"]
 
@@ -81,7 +104,13 @@ dta_agri <- dta_agri[, Tableau := "Agriculture"]
 dta_RH_sante <- dta_RH_sante[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Health.profession)]
 dta_RH_sante <- dta_RH_sante[, Tableau := "Ressources_Sante"]
 
+dta_finance$Unit.of.measure <-  dta_finance$Unité.de.mesure
+dta_finance$Measure <-  dta_finance$Mesure
+dta_finance$Reference.area <-  dta_finance$Zone.de.référence
 
+
+dta_finance <- dta_finance[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE,Fournisseur.de.soins.de.santé,Fonction.de.santé,Mode.de.prestation)]
+dta_finance <- dta_finance[, Tableau := "Ressources_Financiere_Sante"]
 ```
 
 Création du tableau final
@@ -97,17 +126,17 @@ datalist <- list(
   dta_mortalite_evitable = dta_mortalite_evitable,
   dta_qualite_soins = dta_qualite_soins,
   dta_agri = dta_agri,
-  dta_RH_sante = dta_RH_sante
+  dta_RH_sante = dta_RH_sante,
+  dta_finance = dta_finance
 )
 
 data <- rbindlist(datalist, use.names=TRUE, fill=TRUE)
 
-data$Tableau <- as.factor(data$Tableau)
-summary(data)
 ```
 
 # Nettoyage de "Measure"
 ```{r}
+library(stringi)
 
 # 1. Mettre en minuscules
 data[, Measure := tolower(Measure)]
