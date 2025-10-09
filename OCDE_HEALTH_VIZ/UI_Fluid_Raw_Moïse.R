@@ -24,35 +24,78 @@ FR_Condi <- fluidRow(
     # Panneau conditionnel  menu du groupe de variables
     conditionalPanel(
       condition = "input.viz_mode == 'Visualiser les similarités entre pays'",
+      fluidRow(
+        # 2/3 pour le menu déroulant
+        column(
+          width = 8,
+          style = "display: flex; align-items: center;",
+          selectInput(
+            "var_group",
+            "Groupe de variables :",
+            choices = unique(dict$var_group[-1]),
+            selected = "Dépenses en % du total des dépenses de santé"
+          )
+        ),
+        
+        # 1/3 pour le bouton d'aide
+        column(
+          width = 4,
+          style = "display: flex; align-items: center;",
+          actionButton(
+            "help_similarity",
+            label = "",
+            icon = icon("question-circle")
+          )
+        )
+      )
+    ),
+    ############## 2 
+    conditionalPanel(
+      condition = "input.viz_mode == 'Visualiser les scores de performances de santé des pays'",
+      
+      fluidRow(
+        # Colonne 2/3 pour le selectInput
+        column(
+          width = 8,  # 8/12 ≈ 2/3
+          #style = "display: flex; align-items: center;",
+          selectInput(
+            "score_var",
+            "Score à visualiser :",
+            choices = c(
+              "Score global" = "score_global",
+              "Mortalité évitable" = "Mortalité évitable pour 100 000 habitants",
+              "Ressources humaines de santé" = "Emploi en santé pour 1000 habitants",
+              "Qualité des soins" = "Hospitalisations/mortalité évitables pour 1000 patients",
+              "Espérance de vie" = "esperance de vie"
+            ),
+            selected = "score_global"
+          )
+        ),
+        
+        # Colonne 1/3 pour le bouton
+        column(
+          width = 4,  # 4/12 ≈ 1/3
+          style = "display: flex; align-items: center;",
+          actionButton("help_score", label = "", icon = icon("question-circle"))
+        )
+      ),
+      
+      h5("choix des variables à comparer"),
+      
       selectInput(
         "var_group",
         "Groupe de variables :",
         choices = unique(dict$var_group[-1]),
         selected = "Dépenses en % du total des dépenses de santé"
-      ),
-      # Choix du pays de référence
-      selectInput(
-        "ref_country_S",
-        "Pays de référence :",
-        choices = sort(unique(geo_sf$sovereignt)),
-        selected = "France"
       )
     ),
-    ############## 2 
-    conditionalPanel(
-        condition = "input.viz_mode == 'Visualiser les scores de performances de santé des pays'",
-        selectInput(
-          "score_var",
-          "Score à visualiser :",
-          choices = c(
-            "Score global" = "score_global",
-            "Mortalité évitable" = "mortalite_evitable",
-            "Ressources humaines de santé" = "ressources_humaines_sante",
-            "Qualité des soins" = "qualite_soins",
-            "Espérance de vie" = "esperance_de_vie"),
-          selected = "score_global"),
-        h5("Carte interactive des scores de performance")
-        )
+    # Choix du pays de référence
+    selectInput(
+      "ref_country_S",
+      "Pays de référence :",
+      choices = sort(unique(geo_sf$sovereignt)),
+      selected = "France"
+    )
   ),
   
   # Colonne droite : tableau défilant

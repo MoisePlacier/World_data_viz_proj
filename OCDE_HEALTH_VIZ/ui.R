@@ -17,7 +17,7 @@ ui <- navbarPage(
            fluidPage(fluid_page_accueil)),
   
   # --- Comparaison des systèmes de santé ---
-  tabPanel("Comparaison",
+  tabPanel("Comparaison des systèmes de santé",
            fluidPage(wellPanel(FR_Condi),
                      FR_Map,
                      #FR_C_Sim_barplot,

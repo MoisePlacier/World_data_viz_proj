@@ -30,6 +30,11 @@ render_map_similarity <- function(geo_sf, dt, ref_country, vars) {
       color = "white",
       weight = 0.5,
       label = ~paste0(sovereignt, ": ", round(sim, 3)),
+      labelOptions = labelOptions(
+        direction = "auto",
+        sticky = TRUE,    # <--- fait que le label reste affiché
+        textsize = "12px"
+      ),
       highlightOptions = highlightOptions(
         weight = 1,
         color = 'black',
@@ -50,6 +55,9 @@ render_map_similarity <- function(geo_sf, dt, ref_country, vars) {
 render_map_scores <- function(geo_sf, scores_global, var = "score_global") {
   map_data <- merge(geo_sf, scores_global, by = "REF_AREA", all.x = TRUE)
   
+  title_text <- paste("Score :", gsub("_", " ", var))
+  title_wrapped <- gsub("(.{1,15})(\\s|$)", "\\1<br>", title_text)
+  
   if (!(var %in% colnames(map_data))) {
     warning(paste("La variable", var, "n'existe pas dans scores_global."))
     return(NULL)
@@ -68,6 +76,11 @@ render_map_scores <- function(geo_sf, scores_global, var = "score_global") {
       color = "white",
       weight = 0.5,
       label = ~paste0(sovereignt, ": ", round(get(var), 2)),
+      labelOptions = labelOptions(
+        direction = "auto",
+        sticky = TRUE,    # <--- fait que le label reste affiché
+        textsize = "12px"
+      ),
       highlightOptions = highlightOptions(
         weight = 1,
         color = "black",
@@ -78,7 +91,7 @@ render_map_scores <- function(geo_sf, scores_global, var = "score_global") {
       "bottomright",
       pal = pal,
       values = map_data[[var]],
-      title = paste("Score :", gsub("_", " ", var))
+      title = paste(title_wrapped)
     )
 }
 
