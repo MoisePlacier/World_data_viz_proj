@@ -2,12 +2,12 @@
 
 fluid_page_accueil <- fluidPage(
   br(),
-  titlePanel("Visualisation des données OCDE"),
+  titlePanel("Explorateur de données de l'OCDE"),
   br(),
   theme = bs_theme(
-    bootswatch = "minty"#,
-    #base_font = font_google("Inter")#,
-    #navbar_bg = "#25443B"
+    bootswatch = "minty",
+    base_font = font_google("Inter"),
+    navbar_bg = "#25443B"
   ),
   sidebarLayout( # séparé en deux : le sidebar panel avec les selecteurs et le main panel avec la carte et les graphs
     sidebarPanel(
@@ -53,7 +53,7 @@ fluid_page_accueil <- fluidPage(
                  # Curseur dynamique pour l'année
                  card(
                    card_header(textOutput("titre_carte")),
-                   card_body(uiOutput("year_ui")),
+                   card_body(uiOutput("year_map_ui")),
                    
                    leafletOutput("carte", height = 450),
                    br()
@@ -116,7 +116,7 @@ fluid_page_accueil <- fluidPage(
                        )
                      )),
                    br(),
-                   h4("Aperçu des données"),
+                   h4("Jeu de données brutes"),
                    card(
                      full_screen = TRUE,
                      card_header("10 premières lignes :"),
@@ -127,15 +127,16 @@ fluid_page_accueil <- fluidPage(
         ),
         tabPanel("Données manquantes",
                  br(),
+                 uiOutput("year_na_ui"),
                  card(
                    full_screen = TRUE,
-                   card_header("NA plot"),
+                   card_header("Structure des données manquantes : fréquence et combinaisons"),
                    card_body(
                      plotOutput("missing_plot", height = "600px"))),
                  br(),
                  card(
                    full_screen = TRUE,
-                   card_header("Résumé des NA"),
+                   card_header("Résumé"),
                    card_body(verbatimTextOutput("missing_summary")))
         )
         
