@@ -215,6 +215,43 @@ function(input, output, session){
   
   
   
+  
+  
+  ##########################
+  # ---- Super plot ----
+  ##########################
+  observeEvent(
+    list(input$ref_country_S, input$map_shape_click, input$var_group, input$choix_affichage),
+    {
+      clicked <-input$map_shape_click$id
+      req(input$ref_country_S,clicked, input$var_group)
+      
+      # Pays de comparaison au clic (ISO3)
+      ref_country <- input$ref_country_S
+      
+      
+      clicked <- geo_sf %>%
+        filter(REF_AREA == clicked ) %>%
+        pull(sovereignt)
+      
+      vars_for_comp <- dict[var_group == input$var_group, var_label_fr]
+
+      render_super_plot(
+        output,
+        output_id = "super_plot",
+        dt = dt,
+        dict = dict,
+        scores_global = scores_global,
+        geo_sf = geo_sf,
+        ref_country = ref_country,
+        comp_country = clicked,
+        vars_groupe = vars_for_comp,
+        user_choice = input$choix_affichage
+      )
+    }
+  )
+  
+  
   #############################################################################
   ##############################################################################
   

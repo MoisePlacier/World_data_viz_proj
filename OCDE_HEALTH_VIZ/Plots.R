@@ -115,3 +115,125 @@ render_data_table <- function(output, output_id, data_vector, titre = NULL) {
   })
 }
 
+
+
+
+
+render_super_plot <- function(output, output_id, dt, dict, scores_global, geo_sf,
+                              ref_country, comp_country, vars_groupe, user_choice) {
+  
+  output[[output_id]] <- renderPlotly({
+    
+    
+    scores <- copy(scores_global)
+    # Ajout du nom de pays
+    scores <- merge(scores, geo_sf[, c("REF_AREA", "sovereignt")],
+                    by = "REF_AREA", all.x = TRUE)
+    scores$REF_AREA <- scores$sovereignt
+    scores$sovereignt <- NULL
+    scores$geometry <- NULL
+    
+    
+    df_long <- melt(
+      dt[, c("REF_AREA", ..vars_groupe)],
+      id.vars = "REF_AREA",
+      variable.name = "variable",
+      value.name = "valeur"
+    )
+    
+    df_long[, REF_AREA := geo_sf$sovereignt[REF_AREA]]
+    
+    # Moyennes et extrêmes
+    moyenne <- df_long[, .(
+      moyenne_globale = mean(valeur, na.rm = TRUE),
+      valeur_max = max(valeur, na.rm = TRUE),
+      valeur_min = min(valeur, na.rm = TRUE),
+      pays_max = REF_AREA[which.max(valeur)],
+      pays_min = REF_AREA[which.min(valeur)]
+    ), by = variable]
+
+    # Fusion avant le filtrage
+    df_long <- merge(df_long, moyenne, by = "variable", all.x = TRUE)
+    
+    # Sélection uniquement des pays à afficher
+    df_plot <- df_long[REF_AREA %in% c(ref_country, comp_country)]
+    
+    ordre_vars <- df_plot[REF_AREA == ref_country][order(valeur, decreasing = TRUE), variable]
+    df_plot[, variable := factor(variable, levels = ordre_vars)]
+    
+    
+    
+    
+    # --- Construction du graphique ---
+    p <- plot_ly() %>%
+      add_bars(
+        data = df_plot,
+        x = ~valeur,
+        y = ~variable,
+        color = ~REF_AREA,
+        colors = c("#1f77b4", "#ff7f0e"),
+        orientation = "h",
+        text = "",
+        textposition = "none",
+        hoverinfo = "text",
+        hovertext = ~paste0(REF_AREA, "<br>", variable, " : ", round(valeur, 2))
+      )
+    
+    if ("moyenne_globale" %in% user_choice) {
+      p <- p %>% add_trace(
+        data = df_plot,
+        x = ~moyenne_globale,
+        y = ~variable,
+        type = "scatter",
+        mode = "markers",
+        marker = list(color = "#2ca02c", size = 16, symbol = "star-diamond",line = list(color = "black",width = 1)),
+        name = "Moyenne globale",
+        hoverinfo = "text",
+        text = ~paste0("Moyenne globale<br>", variable, " : ", round(moyenne_globale, 2))
+      )
+    }
+    
+    if ("valeur_min" %in% user_choice) {
+      p <- p %>% add_trace(
+        data = df_plot,
+        x = ~valeur_min,
+        y = ~variable,
+        type = "scatter",
+        mode = "markers",
+        marker = list(color = "#d62728", size = 16, symbol = "star-diamond",line = list(color = "black",width = 1)),
+        name = "Valeur min",
+        hoverinfo = "text",
+        text = ~paste0(
+          "Valeur min<br>", variable, " : ", round(valeur_min, 2),
+          "<br>Pays : ", pays_min
+        )
+      )
+    }
+    
+    if ("valeur_max" %in% user_choice) {
+      p <- p %>% add_trace(
+        data = df_plot,
+        x = ~valeur_max,
+        y = ~variable,
+        type = "scatter",
+        mode = "markers",
+        marker = list(color = "#9467bd", size = 16, symbol = "star-diamond",line = list(color = "black",width = 1)),
+        name = "Valeur max",
+        hoverinfo = "text",
+        text = ~paste0(
+          "Valeur max<br>", variable, " : ", round(valeur_max, 2),
+          "<br>Pays : ", pays_max
+        )
+      )
+    }
+    
+    p %>% layout(
+      barmode = "group",
+      xaxis = list(title = "Valeur"),
+      yaxis = list(title = "", automargin = TRUE),
+      legend = list(title = list(text = "Indicateur")),
+      hoverlabel = list(bgcolor = "white", font = list(size = 11))
+    )
+  })
+}
+

@@ -92,7 +92,23 @@ FR_C_Sim_barplot <-fluidRow(
     column(12,h4("Écarts par variable (pays cliqué vs pays de référence)"),plotOutput("barplot_contrib", height = 400))))
 
 
+Check <- checkboxGroupInput(
+  "choix_affichage",
+  label = "Afficher :",
+  choices = c(
+    "Moyenne globale" = "moyenne_globale",
+    "Valeur minimale" = "valeur_min",
+    "Valeur maximale" = "valeur_max"
+  ),
+  selected = c("moyenne_globale")
+)
 
+beau_plot <- plotlyOutput("super_plot", height = "800px")
+
+FR_C_Comparaison_barplot <-fluidRow(
+  column(12,Check,beau_plot)
+  
+)
 
 
 

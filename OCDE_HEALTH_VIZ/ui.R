@@ -20,7 +20,8 @@ ui <- navbarPage(
   tabPanel("Comparaison",
            fluidPage(wellPanel(FR_Condi),
                      FR_Map,
-                     FR_C_Sim_barplot)),
+                     #FR_C_Sim_barplot,
+                     FR_C_Comparaison_barplot)),
   
   # --- Analyse temporelle ---
   tabPanel("Analyse temporelle",
