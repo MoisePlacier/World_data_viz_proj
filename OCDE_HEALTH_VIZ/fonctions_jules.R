@@ -51,3 +51,21 @@ validate_columns <- function(cols, df) {
   
   return(list(valid = TRUE, errors = NULL))
 }
+
+
+prepare_wide_data <- function(df, cols, year_input) {
+  indicator_col <- cols$indicators
+  
+  df_wide <- df %>%
+    filter(.data[[cols$time]] == year_input) %>%
+    select(cols$country, indicator_col, cols$value) %>%
+    # Gérer les doublons en prenant la moyenne
+    group_by(across(c(cols$country, indicator_col))) %>%
+    summarise(value = mean(get(cols$value), na.rm = FALSE), .groups = "drop") %>%
+    pivot_wider(
+      names_from = indicator_col,
+      values_from = value
+    )
+  
+  return(df_wide)
+}

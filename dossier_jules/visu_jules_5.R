@@ -344,8 +344,7 @@ server <- function(input, output, session) {
     df <- data_filtered()
     cols <- columns()
     req(df, cols)
-    
-    # Plus de test : cols$time est garanti d'exister
+
     annees <- sort(unique(as.numeric(df[[cols$time]])))
     annees <- annees[!is.na(annees)]
     
