@@ -1,0 +1,565 @@
+---
+title: "structure_donnees"
+format: html
+editor: visual
+---
+
+## Documentation du traitement des données
+
+## 1. Chargement et validation initiale
+
+### Fonction `identify_columns()`
+
+Cette fonction identifie automatiquement les colonnes du dataset en cherchant parmi des noms standardisés :
+
+```         
+identify_columns <- function(df)
+```
+
+**Colonnes recherchées :**
+
+-   **Temps/Année** : `TIME_PERIOD`, `TIME`, `YEAR`, `obsTime`
+
+-   **Pays** : `REF_AREA`, `COUNTRY`, `LOCATION`
+
+-   **Valeur** : `obsValue`, `OBS_VALUE`, `VALUE`
+
+-   **Unité** : `UNIT_MEASURE`, `UNIT`, `UNITS`, etc.
+
+-   **Indicateurs** : `MEASURE`, `INDICATOR`, `VARIABLE`, `SUBJECT`, `Measure`
+
+**Type de retour :** Liste avec les noms de colonnes identifiés (peut contenir des `NULL`  pour les colonnes optionnelles)
+
+### Fonction `validate_columns()`
+
+Validation des colonnes obligatoires avant tout traitement.
+
+**Colonnes obligatoires vérifiées :**
+
+-   `cols$time` : doit exister et être présente dans le dataframe
+
+-   `cols$country` : doit exister et être présente dans le dataframe
+
+-   `cols$value` : doit exister et être présente dans le dataframe
+
+**Colonnes optionnelles :**
+
+-   `cols$unit` : peut être NULL
+
+-   `cols$indicators` : peut être NULL
+
+**Gestion des erreurs :**
+
+-   Si une colonne obligatoire manque → Message d'erreur explicite
+
+-   L'application empêche toute visualisation tant que la structure n'est pas valide
+
+------------------------------------------------------------------------
+
+## 2. Filtrage des données (`data_filtered()`)
+
+### Traitement effectué
+
+```         
+data_filtered <- reactive({
+  df <- data()
+  cols <- columns()
+  req(df, cols)
+  
+  if (!is.null(input$indicateur) && !is.null(cols$indicators)) {
+    df <- df %>% filter(.data[[cols$indicators]] == input$indicateur)
+  }
+  
+  df
+})
+```
+
+### Types de données en entrée
+
+-   **DataFrame brut** : tel que chargé depuis le fichier RDS ou l'URL SDMX
+
+-   **Colonnes identifiées** : liste validée des noms de colonnes
+
+### Traitement appliqué
+
+1.  **Filtrage par indicateur** : Si l'utilisateur sélectionne un indicateur spécifique, seules les lignes correspondantes sont conservées
+
+2.  **Pas de gestion des doublons** : Les doublons sont conservés à ce stade (gestion dans les graphiques individuels)
+
+3.  **Pas de suppression des NA** : Les valeurs manquantes sont conservées pour analyse ultérieure
+
+### Types de données en sortie
+
+-   DataFrame filtré avec toutes les colonnes originales
+
+-   Structure identique au DataFrame d'entrée
+
+------------------------------------------------------------------------
+
+## 3. Sélecteur d'année (`year_ui`)
+
+### Traitement effectué
+
+```         
+output$year_ui <- renderUI({
+  df <- data_filtered()
+  cols <- columns()
+  req(df, cols)
+  
+  annees <- sort(unique(as.numeric(df[[cols$time]])))
+  annees <- annees[!is.na(annees)]
+  
+  sliderInput("annee", "Année:", ...)
+})
+```
+
+### Types de données en entrée
+
+-   **Colonne temps** : Peut être de type `character`, `numeric`, ou `factor`
+
+-   **DataFrame filtré** : Peut contenir des doublons temporels
+
+### Traitement appliqué
+
+1.  **Conversion numérique** : `as.numeric()` force la conversion en nombre
+
+2.  **Suppression des NA** : Les années invalides (NA) sont retirées
+
+3.  **Suppression des doublons** : `unique()` garde une seule occurrence par année
+
+4.  **Tri** : `sort()` ordonne les années de manière croissante
+
+### Gestion des cas limites
+
+-   Si aucune année valide → Message "Aucune année disponible"
+
+-   Valeur par défaut du slider : année la plus récente (`max(annees)`)
+
+------------------------------------------------------------------------
+
+## 4. Carte mondiale (`donnees_carte()` et `output$carte`)
+
+### Préparation des données (`donnees_carte()`)
+
+```         
+donnees_carte <- reactive({
+  df <- data_filtered()
+  cols <- columns()
+  req(df, cols, input$annee)
+  
+  df_annee <- df %>%
+    filter(.data[[cols$time]] == as.character(input$annee)) %>%
+    group_by(.data[[cols$country]]) %>%
+    summarise(valeur = mean(.data[[cols$value]], na.rm = TRUE), .groups = "drop") %>%
+    filter(is.finite(valeur))
+  
+  names(df_annee)[1] <- "country_code"
+  
+  world %>%
+    left_join(df_annee, by = c("wb_a3" = "country_code"))
+})
+```
+
+### Types de données en entrée
+
+-   **Colonne temps** : Convertie en `character` pour comparaison
+
+-   **Colonne pays** : Codes pays (généralement ISO3)
+
+-   **Colonne valeur** : Données numériques (peuvent contenir des NA ou Inf)
+
+### Traitement des doublons
+
+-   **Agrégation par pays** : `group_by()` + `summarise()` calcule la **moyenne** des valeurs pour chaque pays
+
+-   **Raison** : Certains datasets ont plusieurs lignes par pays (ex: différentes catégories)
+
+### Gestion des données manquantes
+
+1.  **Calcul de la moyenne** : `na.rm = TRUE` ignore les NA dans le calcul
+
+2.  **Filtrage strict** : `is.finite()` retire les `NA`, `Inf`, `-Inf`
+
+3.  **Left join** : Les pays sans données restent sur la carte mais en gris
+
+### Rendu de la carte (`output$carte`)
+
+```         
+output$carte <- renderLeaflet({
+  map_data <- donnees_carte()
+  valeurs_valides <- map_data$valeur[is.finite(map_data$valeur)]
+  
+  if(length(valeurs_valides) == 0) {
+    # Carte vide si pas de données
+    leaflet() %>% ...
+  } else {
+    # Carte avec palette de couleurs
+    pal <- colorNumeric(palette = "RdYlGn", domain = range_global, ...)
+  }
+})
+```
+
+### Gestion de l'échelle de couleurs
+
+-   **Plage globale** : `global_range()` calcule min/max sur **toutes les années**
+
+-   **Avantage** : Échelle fixe permettant de comparer les années entre elles
+
+-   **Couleur NA** : Gris (`#d3d3d3`) pour les pays sans données
+
+### Types de données en sortie
+
+-   **Objet Leaflet** : Carte interactive avec polygones colorés
+
+-   **Légende** : Basée sur la plage globale des données
+
+------------------------------------------------------------------------
+
+## 5. Graphique d'évolution temporelle (`output$graphique_evolution`)
+
+### Traitement effectué
+
+```         
+output$graphique_evolution <- renderPlot({
+  df <- data_filtered()
+  cols <- columns()
+  req(df, cols, input$countries)
+  
+  plot_data <- df %>%
+    filter(.data[[cols$country]] %in% input$countries) %>%
+    mutate(year = as.numeric(.data[[cols$time]])) %>%
+    group_by(.data[[cols$country]], year) %>%
+    summarise(value = mean(as.numeric(.data[[cols$value]]), na.rm = TRUE), .groups = "drop")
+})
+```
+
+### Types de données en entrée
+
+-   **Sélection multiple de pays** : Vecteur de codes pays (ex: `c("FRA", "USA")`)
+
+-   **Colonne temps** : Convertie en numérique
+
+-   **Colonne valeur** : Données numériques brutes
+
+### Traitement des doublons
+
+-   **Agrégation par pays ET année** : `group_by()` sur deux colonnes
+
+-   **Moyenne des valeurs** : Comme pour la carte, les doublons sont moyennés
+
+-   **Raison** : Assure une seule valeur par pays et par année
+
+### Gestion des données manquantes
+
+1.  **Conversion numérique** : `as.numeric()` peut créer des NA
+
+2.  **Calcul de la moyenne** : `na.rm = TRUE` ignore les NA
+
+3.  **Pas de filtrage** : Contrairement à la carte, les NA sont conservés (apparaissent comme des discontinuités dans les lignes)
+
+### Type de graphique
+
+-   **ggplot2** : Graphique en lignes (`geom_line()`) avec points (`geom_point()`)
+
+-   **Couleur** : Une couleur par pays automatiquement
+
+-   **Échelle** : Dynamique selon les données affichées (pas de plage fixe)
+
+### Gestion des cas limites
+
+-   Si `nrow(plot_data) == 0` → Message "Pas de données disponibles"
+
+-   Graphique vide avec texte centré
+
+------------------------------------------------------------------------
+
+## 6. Statistiques descriptives
+
+### Nombre de lignes (`output$n_lignes`)
+
+```         
+output$n_lignes <- renderText({
+  nrow(data_filtered())
+})
+```
+
+**Données comptabilisées :**
+
+-   Toutes les lignes du DataFrame filtré
+
+-   Inclut les doublons et les lignes avec NA
+
+------------------------------------------------------------------------
+
+### Nombre de colonnes (`output$n_colonnes`)
+
+```         
+output$n_colonnes <- renderText({
+  ncol(data_filtered())
+})
+```
+
+**Données comptabilisées :**
+
+-   Toutes les colonnes du DataFrame (y compris celles non utilisées)
+
+------------------------------------------------------------------------
+
+### Nombre de pays (`output$n_pays`)
+
+```         
+output$n_pays <- renderText({
+  length(unique(df[[cols$country]]))
+})
+```
+
+**Traitement appliqué :**
+
+-   `unique()` : Suppression des doublons de codes pays
+
+-   `length()` : Compte le nombre de pays distincts
+
+**Gestion des NA :** Les NA dans la colonne pays sont comptés comme une catégorie unique
+
+------------------------------------------------------------------------
+
+### Nombre d'années (`output$n_annees`)
+
+```         
+output$n_annees <- renderText({
+  length(unique(df[[cols$time]]))
+})
+```
+
+**Traitement appliqué :**
+
+-   `unique()` : Suppression des doublons d'années
+
+-   Pas de conversion numérique : compte les valeurs uniques telles quelles
+
+**Gestion des NA :** Les NA sont comptés comme une catégorie unique
+
+------------------------------------------------------------------------
+
+### Nombre d'indicateurs (`output$n_indicateurs`)
+
+```         
+output$n_indicateurs <- renderText({
+  if (!is.null(cols$indicators)) {
+    length(unique(df[[cols$indicators]]))
+  } else {
+    "-"
+  }
+})
+```
+
+**Traitement appliqué :**
+
+-   Vérifie d'abord l'existence de la colonne indicateurs
+
+-   Si elle existe : compte les valeurs uniques
+
+-   Sinon : affiche "-"
+
+------------------------------------------------------------------------
+
+### Plage temporelle (`output$plage_temporelle`)
+
+```         
+output$plage_temporelle <- renderText({
+  annees <- as.numeric(df[[cols$time]])
+  annees <- annees[!is.na(annees)]
+  if (length(annees) > 0) {
+    paste0(min(annees), " - ", max(annees))
+  } else {
+    "-"
+  }
+})
+```
+
+**Traitement appliqué :**
+
+1.  **Conversion numérique** : `as.numeric()` force la conversion
+
+2.  **Suppression des NA** : Filtre `!is.na()`
+
+3.  **Calcul min/max** : Trouve la première et dernière année
+
+**Gestion des cas limites :**
+
+-   Si aucune année valide → affiche "-"
+
+------------------------------------------------------------------------
+
+## 7. Aperçu des données (`output$data_preview`)
+
+```         
+output$data_preview <- renderTable({
+  head(data_filtered(), 10)
+})
+```
+
+### Données affichées
+
+-   **10 premières lignes** du DataFrame filtré
+
+-   **Toutes les colonnes** sont affichées
+
+-   **Format brut** : Aucun traitement supplémentaire
+
+**Utilité :** Permet à l'utilisateur de vérifier la structure et le contenu des données chargées
+
+------------------------------------------------------------------------
+
+## 8. Fonction `global_range()`
+
+```         
+global_range <- reactive({
+  df <- data_filtered()
+  cols <- columns()
+  
+  valeurs <- as.numeric(df[[cols$value]])
+  valeurs <- valeurs[is.finite(valeurs)]
+  
+  if (length(valeurs) > 0) {
+    c(min(valeurs), max(valeurs))
+  } else {
+    c(0, 1)
+  }
+})
+```
+
+### Types de données en entrée
+
+-   **Colonne valeur** : Peut contenir NA, Inf, -Inf
+
+### Traitement appliqué
+
+1.  **Conversion numérique** : Force le type numérique
+
+2.  **Filtrage strict** : `is.finite()` retire NA, Inf, -Inf
+
+3.  **Calcul min/max** : Sur **toutes les années** du dataset filtré
+
+### Utilisation
+
+-   **Carte** : Pour maintenir une échelle de couleurs fixe entre les années
+
+-   **Légende** : Affiche la plage complète des données
+
+**Valeur par défaut :** `c(0, 1)` si aucune valeur valide
+
+------------------------------------------------------------------------
+
+## 9. Fonction `get_unit()`
+
+```         
+get_unit <- reactive({
+  df <- data_filtered()
+  cols <- columns()
+  
+  if (!is.null(cols$unit)) {
+    unit <- unique(df[[cols$unit]])[1]
+    if (!is.na(unit) && unit != "") {
+      return(paste0(" (", unit, ")"))
+    }
+  }
+  return("")
+})
+```
+
+### Traitement appliqué
+
+1.  **Vérification de l'existence** : Teste si `cols$unit` existe
+
+2.  **Extraction** : Prend la première valeur unique de la colonne unité
+
+3.  **Validation** : Vérifie que ce n'est pas NA ou chaîne vide
+
+4.  **Formatage** : Ajoute des parenthèses pour l'affichage
+
+**Utilisation :** Ajout automatique de l'unité dans les titres d'axes des graphiques
+
+------------------------------------------------------------------------
+
+## 10. Analyse des valeurs manquantes
+
+### Préparation des données wide (`data_wide()`)
+
+```         
+data_wide <- reactive({
+  req(data(), columns())
+  prepare_wide_data(data(), columns())
+})
+```
+
+**Note :** La fonction `prepare_wide_data()` n'est pas fournie dans le code, mais elle transforme probablement les données au format large (une colonne par pays/année).
+
+### Graphique des valeurs manquantes (`output$missing_plot`)
+
+```         
+output$missing_plot <- renderPlot({
+  req(data_wide())
+  aggr(data_wide(), only.miss = TRUE, sortVar = TRUE)
+})
+```
+
+**Package utilisé :** `VIM` (Visualization and Imputation of Missing Values)
+
+**Paramètres :**
+
+-   `only.miss = TRUE` : Affiche uniquement les patterns de valeurs manquantes
+
+-   `sortVar = TRUE` : Trie les variables par nombre de valeurs manquantes
+
+**Type de visualisation :** Barplot + matrice binaire des patterns de NA
+
+### Résumé des valeurs manquantes (`output$missing_summary`)
+
+```         
+output$missing_summary <- renderPrint({
+  req(data_wide())
+  res <- summary(aggr(data_wide(), prop = TRUE, combined = TRUE))$combinations
+  res[rev(order(res[,2])),]
+})
+```
+
+**Paramètres :**
+
+-   `prop = TRUE` : Calcule les proportions de valeurs manquantes
+
+-   `combined = TRUE` : Combine les patterns de NA
+
+**Affichage :** Tableau trié par fréquence décroissante des patterns de valeurs manquantes
+
+------------------------------------------------------------------------
+
+## Résumé des principes de traitement
+
+### Doublons
+
+-   **Carte et graphique d'évolution** : Agrégation par moyenne
+
+-   **Statistiques** : Comptage avec `unique()`
+
+-   **Aperçu** : Conservation des doublons
+
+### Valeurs manquantes (NA)
+
+-   **Conversions numériques** : Peuvent créer des NA
+
+-   **Calculs de moyenne** : `na.rm = TRUE` systématiquement
+
+-   **Carte** : Filtrage strict avec `is.finite()`
+
+-   **Graphique d'évolution** : Conservation des NA (discontinuités)
+
+-   **Statistiques** : Généralement comptés comme catégorie unique
+
+### Types de données
+
+-   **Temps** : Conversion systématique en numérique quand nécessaire
+
+-   **Valeur** : Toujours forcé en numérique
+
+-   **Pays/Indicateurs** : Conservés dans leur type d'origine (character/factor)
