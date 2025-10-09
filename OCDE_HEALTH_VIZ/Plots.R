@@ -32,7 +32,7 @@ render_map_similarity <- function(geo_sf, dt, ref_country, vars) {
       label = ~paste0(sovereignt, ": ", round(sim, 3)),
       labelOptions = labelOptions(
         direction = "auto",
-        sticky = TRUE,    # <--- fait que le label reste affiché
+        sticky = TRUE,   
         textsize = "12px"
       ),
       highlightOptions = highlightOptions(
@@ -165,10 +165,9 @@ render_super_plot <- function(output, output_id, dt, dict, scores_global, geo_sf
       pays_min = REF_AREA[which.min(valeur)]
     ), by = variable]
 
-    # Fusion avant le filtrage
+
     df_long <- merge(df_long, moyenne, by = "variable", all.x = TRUE)
     
-    # Sélection uniquement des pays à afficher
     df_plot <- df_long[REF_AREA %in% c(ref_country, comp_country)]
     
     ordre_vars <- df_plot[REF_AREA == ref_country][order(valeur, decreasing = TRUE), variable]
@@ -242,10 +241,10 @@ render_super_plot <- function(output, output_id, dt, dict, scores_global, geo_sf
     
     p %>% layout(
       barmode = "group",
-      xaxis = list(title = "Valeur"),
-      yaxis = list(title = "", automargin = TRUE),
-      legend = list(title = list(text = "Indicateur")),
-      hoverlabel = list(bgcolor = "white", font = list(size = 11))
+      xaxis = list(title = "Valeur observée" ,font = list(size = 20)),
+      yaxis = list(title = "", tickfont = list(size = 16), automargin = TRUE),
+      legend = list(title = list(text = "Indicateur"), font = list(size = 20),automargin = TRUE),
+      hoverlabel = list(bgcolor = "white", font = list(size = 13))
     )
   })
 }

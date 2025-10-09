@@ -170,7 +170,7 @@ function(input, output, session){
         Top_Pays <- merge(Top_Pays, geo_sf[, c("REF_AREA", "sovereignt")], 
                           by = "REF_AREA", all.x = TRUE)
         Top_Pays <- Top_Pays[, c("sovereignt", "sim")]
-        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Classement des pays les plus similaires à ", input$ref_country_S))
+        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Scores de similarité avec ", input$ref_country_S))
         
 
       }
@@ -183,7 +183,7 @@ function(input, output, session){
         Top_Pays <- merge(Top_Pays, geo_sf[, c("REF_AREA", "sovereignt")], 
                           by = "REF_AREA", all.x = TRUE)
         Top_Pays <- Top_Pays[, c("sovereignt", "Score")]
-        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Classement des pays pour le score :", input$score_var))
+        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Scores des pays par rapport à :", input$score_var))
       }
     }
   )

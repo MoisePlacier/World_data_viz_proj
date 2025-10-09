@@ -113,7 +113,7 @@ FR_Condi <- fluidRow(
 Condi_MAP <- conditionalPanel(
   condition = "true",  # toujours visible
   h4("Carte interactive"),
-  leafletOutput("map", height = 400)
+  leafletOutput("map", height = "600px", width = "100%")
 )
 
 top_10_Table <- conditionalPanel(
@@ -123,8 +123,8 @@ top_10_Table <- conditionalPanel(
 )
 
 FR_Map <- fluidRow(
-  column(4,top_10_Table),
-  column(8,Condi_MAP)
+  column(3,top_10_Table),
+  column(9,Condi_MAP)
   
   )
 ######################################################################
