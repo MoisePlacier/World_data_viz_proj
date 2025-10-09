@@ -1,55 +1,3 @@
-#
-library(here)
-
-## Notes à faire demain 
-
-# Régler le prblm dimport des données dans lenvironement global ... 
-# 
-# Homogénéiser les grps de variables ! (séparer les % des nbr absolus etcs)
-# Recalculer les scores avec ces nouvaux groups
-# 
-# sur la carte interactive : enlever le pays de référence pour qualibrer l échelle de couleurs (le mettre d une autre couleur)
-# 
-# Ajouter la possibilité d'afficher les variables directement ou d'afficher les scores. 
-#
-#
-
-# Concevoir un plot de comparaison d un pay références pour un groupe de variable donné
-# 
-# modalités de comparaisons : 
-#   1) VS la moyenne pour tous les pays de ces variables 
-#   2) VS les valeurs d un autre pays choisi
-#   3) vs les valeurs des variables pour le pays qui a le meilleur score global 
-#   4) vs les valeurs des variables pour le pays qui a le meilleur score selon un groupe de variable évalué 
-# 
-# Mapper le noms des pays avec l ISO ...
-
-####
-euclid_sim <- function(x, y) {
-  1 / (1 + sqrt(sum((x - y)^2)))
-}
-
-calc_similarity <- function(dt, selected_country, vars) {
-  dt_scaled <- copy(dt)
-  # On ne scale pas ici si on veut garder les unités réelles
-  x_ref <- as.numeric(dt_scaled[REF_AREA == selected_country, ..vars])
-  sims <- dt_scaled[, .(REF_AREA, sim = apply(.SD, 1, function(y) euclid_sim(x_ref, as.numeric(y)))), .SDcols = vars]
-  sims[]
-}
-
-calc_contrib <- function(dt, ref_country, clicked_country, vars){
-  x <- as.numeric(dt[REF_AREA == ref_country, ..vars])
-  y <- as.numeric(dt[REF_AREA == clicked_country, ..vars])
-  
-  diff <- y - x
-  contrib <- diff / sum(abs(diff))  # pondération en conservant le signe
-  
-  data.table(variable = vars,
-             difference = diff,
-             contribution = contrib)[order(-abs(contribution))]
-}
-
-
 library(ggplot2)
 library(RColorBrewer)
 library(shiny)
@@ -59,44 +7,73 @@ library(dplyr)
 library(sf)
 library(rnaturalearth)
 library(rnaturalearthdata)
+library(dplyr)
+source("Utilis.R")
+source("Plots.R")
+source("server_jules.R")
+source("fonctions_jules.R")
+library(DT)
+library(shinyBS) 
+
+# Enable thematic
+thematic::thematic_shiny(font = "auto")
+
+# Change ggplot2's default "gray" theme
+theme_set(theme_bw(base_size = 16))
+
+
 
 # Charger le fond de carte
 geo_sf <- ne_countries(scale = "medium", returnclass = "sf")
 
 #### data
-load("../Data/merged_inputed.RData")
-dt <- as.data.table(dt_excl)
+dt <- readRDS("../Data/merged_imputed.rds")
+dt <- as.data.table(dt)
 dt[, REF_AREA := as.factor(REF_AREA)]
-#dt[, dep_sante_Totale_Depenses_sante := NULL]
+
 
 #### dict 
-
-load("../Data/Labels_dict_wide.RData")  # suppose que l'objet dedans s'appelle dict
-# maintenant dict existe dans l'environnement
-dict <- as.data.table(Labels_dict_wide)
-
-colnames(dict)
+dict <- readRDS("../Data/Labels_dict.rds")
+dict <- as.data.table(dict)
 setnames(dt, old = dict$var_full, new = dict$var_label_fr)
 
-
-#### scores 
-
-load("../Data/scores_global.RData")  # suppose que l'objet dedans s'appelle dict
-# maintenant dict existe dans l'environnement
-scores_global <- as.data.table(scores)
-
-####### groupes de variables pour les scores 
-
-load("../data/vars_groupes_scores.RData")
-
-vars_groupes_scores <-as.data.table(vars_groupes)
-
+###################################
 # Filtrer le fond de carte
 filtre <- dt$REF_AREA
-geo_sf <- geo_sf[geo_sf$gu_a3 %in% filtre, ]
-
+geo_sf <- geo_sf[geo_sf$gu_a3 %in% filtre,]
 # Ajouter une colonne REF_AREA 
 geo_sf$REF_AREA <- geo_sf$gu_a3
+########################################
+
+########## scores 
+scores_global <- readRDS("../Data/scores_globaux.rds")
+scores_global <- as.data.table(scores_global)
+
+####### groupes de variables pour les scores 
+vars_groupes_scores <- readRDS("../Data/vars_groupes_scores.rds")
+vars_groupes_scores <- as.data.table(vars_groupes_scores)
+
+
+
+
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(leaflet)
+library(rnaturalearth)
+library(sf)
+library(countrycode)
+library(rsdmx)
+library(bslib)
+library(tidyverse)
+library(VIM)
+library(bsicons)
+
+
+############## Datas Jules 
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+preloaded_datasets <- list.files("../Data/", pattern = "\\.rds$", full.names = FALSE)
 
 
 
@@ -104,73 +81,182 @@ geo_sf$REF_AREA <- geo_sf$gu_a3
 
 function(input, output, session){
   
-  # Mettre à jour la sélection des variables selon le groupe choisi
-  output$vars_ui <- renderUI({
-    vars_in_group <- dict[var_group == input$var_group, var_label_fr]
-    selectInput("vars", "Variables :", choices = vars_in_group,
-                selected = vars_in_group, multiple = TRUE)
+####################################################################
+  ######################tableau des variables #########################
+  
+  observeEvent({
+    input$viz_mode
+    input$var_group
+    input$score_var
+  }, {
+    req(input$viz_mode)
+    
+    if (input$viz_mode == "Visualiser les similarités entre pays") {
+      vars_for_sim <- dict[var_group == input$var_group, var_label_fr]
+      render_data_table(
+        output,
+        "my_table",
+        vars_for_sim,
+        titre = paste("Détail des variables utilisées pour le calcul de la similarité entre les pays")
+      )
+    } 
+    
+    else if (input$viz_mode == "Visualiser les scores de performances de santé des pays") {
+      if (input$score_var != "score_global") {
+        vars_for_scores <- dict[var_group == input$score_var, var_label_fr]
+        #vars_for_scores <- unique(vars_groupes_scores[[input$score_var]])
+      } else {
+        # Toutes les variables de toutes les colonnes
+        vars_for_scores <- unique(unlist(vars_groupes_scores))
+      }
+      
+      render_data_table(
+        output,
+        "my_table",
+        vars_for_scores,
+        titre = paste("Détail des variables utilisées pour le calcul du score")
+      )
+    }
   })
   
-  ############## Carte initiale ###################@
+  
+
+  
+  ############## Carte initiale ###################
+  # output$map <- renderLeaflet({
+  #   leaflet(geo_sf) %>%
+  #     addTiles() %>%
+  #     addPolygons(
+  #       layerId = ~REF_AREA,
+  #       fillColor = "lightgrey",
+  #       fillOpacity = 0.7,
+  #       color = "white",
+  #       weight = 0.5,
+  #       label = ~sovereignt
+  #     )
+  # })
   output$map <- renderLeaflet({
     leaflet(geo_sf) %>%
       addTiles() %>%
-      addPolygons(layerId = ~REF_AREA,
-                  fillColor = "lightgray",
-                  fillOpacity = 0.7,
-                  color = "white",
-                  weight = 0.5,
-                  label = ~REF_AREA)
+      addPolygons(
+        layerId = ~REF_AREA,
+        fillColor = "lightgrey",
+        fillOpacity = 0.7,
+        color = "white",
+        weight = 0.5,
+        label = ~sovereignt,
+        labelOptions = labelOptions(
+          direction = "auto",
+          sticky = TRUE,    # <--- fait que le label reste affiché
+          textsize = "12px"
+        )
+      )
   })
   
-  ###### Mise à jour de la carte selon pays de référence et variables choisies##############
-  observeEvent(c(input$ref_country_S, input$vars), {
-    req(input$ref_country_S, input$vars)
-    sims <- calc_similarity(dt, input$ref_country_S, input$vars)
-    
-    map_data <- merge(geo_sf, sims, by="REF_AREA", all.x=TRUE)
-    
+  ###############################################################
+  ###### Mise à jour de la carte ##############################
+  
+  observeEvent(
+    list(input$viz_mode, input$ref_country_S, input$var_group, input$score_var),
+    {
+      req(input$viz_mode)
+      
+      if (input$viz_mode == "Visualiser les similarités entre pays") {
+        req(input$ref_country_S, input$var_group)
+        vars_for_sim <- dict[var_group == input$var_group, var_label_fr]
+        
+        sims <-render_map_similarity(geo_sf, dt, input$ref_country_S, vars_for_sim)
+        Top_Pays <- sims[order(-sims$sim), ]           # tri par similarité décroissante
+        Top_Pays <- merge(Top_Pays, geo_sf[, c("REF_AREA", "sovereignt")], 
+                          by = "REF_AREA", all.x = TRUE)
+        Top_Pays <- Top_Pays[, c("sovereignt", "sim")]
+        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Scores de similarité avec ", input$ref_country_S))
+        
 
-    #pal <- colorNumeric(palette = "RdBu",domain = map_data$sim,reverse = TRUE)
-    pal <- colorNumeric("Blues", domain=map_data$sim, na.color="white")
-    
-    
-    leafletProxy("map") %>%
-      clearShapes() %>%
-      clearControls() %>%
-      addPolygons(data=map_data,
-                  layerId = ~REF_AREA,
-                  fillColor = ~pal(sim),
-                  fillOpacity = 0.8,
-                  color = "white",
-                  weight = 0.5,
-                  label = ~paste0(REF_AREA, ": ", round(sim,3)),
-                  highlightOptions = highlightOptions(
-                    weight = 1,
-                    color = 'black',
-                    bringToFront = TRUE)
-                  ) %>%
-      addLegend("bottomright", pal=pal, values=map_data$sim,
-                title=paste("Similarité à", input$ref_country_S))
+      }
+      
+      else if (input$viz_mode == "Visualiser les scores de performances de santé des pays") {
+        req(input$score_var)
+        render_map_scores(geo_sf, scores_global, var = input$score_var)
+        
+        Top_Pays <- scores_global[order(-get(input$score_var))][, .(REF_AREA,Score = get(input$score_var))]
+        Top_Pays <- merge(Top_Pays, geo_sf[, c("REF_AREA", "sovereignt")], 
+                          by = "REF_AREA", all.x = TRUE)
+        Top_Pays <- Top_Pays[, c("sovereignt", "Score")]
+        render_data_table(output,"T_top_pays",Top_Pays,titre = paste("Scores des pays par rapport à :", input$score_var))
+      }
+    }
+  )
+  
+
+  
+  observeEvent(input$help_score, {
+    showModal(modalDialog(
+      title = "Détails du calcul des scores",
+      size = "l", 
+      easyClose = TRUE,
+      withMathJax(
+      HTML('
+      <p>Normalisation des variables :</p>
+      $$\\tilde{x}_{ij} =
+      \\begin{cases}
+      \\frac{x_{ij} - \\min(\\mathbf{x}_j)}{\\max(\\mathbf{x}_j) - \\min(\\mathbf{x}_j)} & \\text{si $x_j$ est à maximiser}, \\\\
+      \\frac{\\max(\\mathbf{x}_j) - x_{ij}}{\\max(\\mathbf{x}_j) - \\min(\\mathbf{x}_j)} & \\text{si $x_j$ est à minimiser.}
+      \\end{cases}$$
+      
+      <p>Score par groupe :</p>
+      $$S_i(g) = \\frac{1}{p_g} \\sum_{j \\in g} \\tilde{x}_{ij}$$
+      
+      <p>Score global :</p>
+      $$S_{i}^{\\text{global}} = \\frac{1}{G} \\sum_{g=1}^G S_i(g)$$
+      ')),
+      footer = modalButton("Fermer")
+    ))
   })
+  
+  observeEvent(input$help_similarity, {
+    showModal(modalDialog(
+      title = "Calcul du score de similarité",
+      withMathJax(
+        helpText(
+          "La similarité entre le pays de référence et le pays i est définie par la distance euclidienne inversée :",
+          "$$ S_i = \\frac{1}{1 + \\sqrt{\\sum_{j \\in V} (x_{ref,j} - x_{i,j})^2}} $$",
+          "où :",
+          "$$V$$ est l'ensemble des variables sélectionnées pour la comparaison,",
+          "$$x_{ref,j}$$ est la valeur de la variable $$j$$ pour le pays de référence,",
+          "$$x_{i,j}$$ est la valeur de la variable $$j$$ pour le pays $$i$$.",
+          "Cette formule garantit que $$S_i \\in (0,1]$$, avec $$S_i = 1$$ si le pays i est identique au pays de référence pour toutes les variables."
+        )
+      ),
+      easyClose = TRUE,
+      footer = modalButton("Fermer")
+    ))
+  })
+  
+  
+  
+  
   
   ############## Barplot des contributions sur clic ##########################
   observeEvent(input$map_shape_click, {
     clicked <- input$map_shape_click$id
-    req(clicked, input$ref_country_S, input$vars)
+    req(clicked, input$ref_country_S, input$var_group)
     
-    contrib_dt <- calc_contrib(dt, input$ref_country_S, clicked, input$vars)
+    ref_country_S <- geo_sf %>%
+      filter(sovereignt == input$ref_country_S) %>%
+      pull(REF_AREA)
     
+    vars_for_sim <- dict[var_group == input$var_group, var_label_fr]
+    
+    contrib_dt <- calc_contrib(dt, ref_country_S, clicked, vars_for_sim)
     
     output$barplot_contrib <- renderPlot({
       ggplot(contrib_dt, aes(x = reorder(variable, difference), y = difference)) +
         geom_bar(stat = "identity", fill = "steelblue") +
         coord_flip() +
         labs(
-          title = paste0(
-            "Écarts moyens par variable entre ", clicked, " et ", input$ref_country_S
-          ),
-          subtitle = "Barres positives : valeurs plus élevées dans le pays sélectionné\nBarres négatives : valeurs plus faibles que le pays de référence",
+          title = paste0("Différence par variable : ", clicked, " - ", ref_country_S),
+          subtitle = "Barres positives : valeurs plus fortes que le pays de référence\nBarres négatives : valeurs plus faibles que le pays de référence",
           x = "Variables",
           y = "Différence (dans les unités d'origine)"
         ) +
@@ -180,57 +266,445 @@ function(input, output, session){
           plot.subtitle = element_text(size = 11, color = "gray40")
         )
     })
-    ###############################################################################
-    ########## Graphique de comparaison des valeurs par variable################### unique(dict$var_group)
+  })
+  
+  
+  
+  
+  
+  ##########################
+  # ---- Super plot ----
+  ##########################
+  observeEvent(
+    list(input$ref_country_S, input$map_shape_click, input$var_group, input$choix_affichage),
+    {
+      clicked <-input$map_shape_click$id
+      req(input$ref_country_S,clicked, input$var_group)
+      
+      # Pays de comparaison au clic (ISO3)
+      ref_country <- input$ref_country_S
+      
+      
+      clicked <- geo_sf %>%
+        filter(REF_AREA == clicked ) %>%
+        pull(sovereignt)
+      
+      vars_for_comp <- dict[var_group == input$var_group, var_label_fr]
+
+      render_super_plot(
+        output,
+        output_id = "super_plot",
+        dt = dt,
+        dict = dict,
+        scores_global = scores_global,
+        geo_sf = geo_sf,
+        ref_country = ref_country,
+        comp_country = clicked,
+        vars_groupe = vars_for_comp,
+        user_choice = input$choix_affichage
+      )
+    }
+  )
+  
+  
+  #############################################################################
+  ##############################################################################
+  
+  
+  
+  # Stockage des données chargées depuis une URL
+  custom_data <- reactiveVal(NULL)
+  custom_columns <- reactiveVal(NULL)
+  
+  # Charger les données depuis l'URL personnalisée
+  observeEvent(input$load_url, {
+    req(input$custom_url)
     
-    output$comparison_plot <- renderPlot({
-      req(input$ref_country_C, input$vars_G, input$compare_mode)
-      vars_C <-unique(vars_groupes_scores$vars_G)
-      dt_ref <- dt[REF_AREA == input$ref_country_C, ..vars_C]
+    showNotification("Chargement...", id = "loading", duration = NULL)
+    
+    tryCatch({
+      # Lire les données SDMX
+      sdmx_data <- readSDMX(input$custom_url)
+      df <- as.data.frame(sdmx_data)
+      # Sauvegarder dans le fichier des datasets préchargés
+      saveRDS(df, file = paste0("../Data/", input$file_name, ".rds"))
       
-      # Calcul des valeurs comparatives selon le mode choisi
       
-      comp_values <- switch(input$compare_mode,
-                            
-                            # 1) Moyenne
-                            "Moyenne" = colMeans(dt[, ..vars_C], na.rm = TRUE),
-                            
-                            # 2) Meilleur pays selon le score du groupe
-                            "Meilleur pays" = {
-                              # On suppose que chaque variable appartient à un groupe
-                              # On prend le meilleur pays selon le score correspondant au groupe
-                              group_name <- input$vars_G
-                              best_country <- scores[which.max(get(group_name)), REF_AREA]
-                              dt[REF_AREA == best_country, ..vars_C]
-                            },
-                            
-                            # 3) Pays spécifique
-                            "Pays spécifique" = dt[REF_AREA == input$specific_country, ..vars_C]
-      )
+      # Identifier et valider les colonnes
+      cols <- identify_columns(df)
+      validation <- validate_columns(cols, df)
       
-      # Préparer un dataframe pour ggplot
-      plot_df <- data.frame(
-        variable = vars_C,
-        ref_value = as.numeric(dt_ref),
-        comp_value = as.numeric(comp_values)
-      )
-
-      # Tracer
-      ggplot(plot_df, aes(x = reorder(variable, ref_value))) +
-        geom_bar(aes(y = ref_value), stat = "identity", fill = "steelblue", alpha = 0.7) +
-        geom_point(aes(y = comp_value), color = "red", size = 3) +
-        coord_flip() +
-        labs(
-          title = paste("Comparaison des variables pour", input$ref_country_C),
-          subtitle = paste("Points rouges :", input$compare_mode),
-          x = "Variable",
-          y = "Valeur"
-        ) +
-        theme_minimal(base_size = 13)
-        
-
+      if (!validation$valid) {
+        stop(paste("Erreurs de structure:", paste(validation$errors, collapse = ", ")))
+      }
+      
+      # Stocker les données
+      custom_data(df)
+      custom_columns(cols)
+      
+      removeNotification("loading")
+      showNotification("Chargé avec succès!", type = "message", duration = 3)
+      
+    }, error = function(e) {
+      removeNotification("loading")
+      showNotification(paste("Erreur:", e$message), type = "error", duration = 5)
+      custom_data(NULL)
+      custom_columns(NULL)
     })
+  })
+  
+  # Renvoie les données selon le mode sélectionné
+  data <- reactive({
+    if (input$mode == "preloaded") {
+      req(input$dataset_preloaded)
+      readRDS(file.path("../Data/", input$dataset_preloaded))
+    } else {
+      req(custom_data())
+      custom_data()
+    }
+  })
+  
+  # Colonnes avec validation intégrée
+  columns <- reactive({
+    df <- data()
+    req(df)
+    
+    cols <- if (input$mode == "preloaded") {
+      identify_columns(df)
+    } else {
+      req(custom_columns())
+      custom_columns()
+    }
+    
+    # Valider les colonnes
+    validation <- validate_columns(cols, df)
+    if (!validation$valid) {
+      showNotification(
+        paste("Données invalides:", paste(validation$errors, collapse = ", ")),
+        type = "error",
+        duration = NULL
+      )
+      return(NULL)
+    }
+    
+    cols
+  })
+  
+  
+  # Créé dynamiquement si la colonne indicateur existe
+  output$indicator_ui <- renderUI({
+    df <- data()
+    cols <- columns()
+    req(df, cols)
+    
+    indicators <- unique(df[[cols$indicators]])
+    
+    selectInput("indicateur",
+                "Indicateur:",
+                choices = indicators,
+                selected = indicators[1])
     
   })
+  
+  output$year_map_ui <- renderUI({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    
+    # Plus de test : cols$time est garanti d'exister
+    annees <- sort(unique(as.numeric(df[[cols$time]])))
+    annees <- annees[!is.na(annees)]
+    
+    if (length(annees) == 0) {
+      return(p("Aucune année disponible", style = "color: red;"))
+    }
+    
+    sliderInput("annee_map", "Sélectionner une année :",
+                min = min(annees),
+                max = max(annees),
+                value = max(annees),
+                step = 1,
+                sep = "")
+  })
+  
+  
+  output$year_na_ui <- renderUI({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    annees <- sort(unique(as.numeric(df[[cols$time]])))
+    annees <- annees[!is.na(annees)]
+    
+    if (length(annees) == 0) {
+      return(p("Aucune année disponible", style = "color: red;"))
+    }
+    
+    sliderInput("annee_na", "Sélectionner une année :",
+                min = min(annees),
+                max = max(annees),
+                value = max(annees),
+                step = 1,
+                sep = "")
+  })
+  
+  
+  
+  data_filtered <- reactive({
+    df <- data()
+    cols <- columns()
+    req(df, cols, cols$indicators, input$indicateur)
+    
+    df <- df %>% filter(.data[[cols$indicators]] == input$indicateur)
+  })
+  
+  # Récupère l'unité de mesure pour les graphiques
+  get_unit <- reactive({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    
+    if (!is.null(cols$unit)) {
+      unit <- unique(df[[cols$unit]])[1]
+      if (!is.na(unit) && unit != "") {
+        return(paste0(unit))
+      }
+    }
+    return("")
+  })
+  
+  # Calcule min/max sur toutes les années pour garder la même échelle
+  global_range <- reactive({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    
+    valeurs <- as.numeric(df[[cols$value]])
+    valeurs <- valeurs[is.finite(valeurs)]
+    
+    if (length(valeurs) > 0) {
+      c(min(valeurs), max(valeurs))
+    } else {
+      c(0, 1)
+    }
+  })
+  
+  # Liste simple de tous les pays disponibles
+  output$country_selector <- renderUI({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    
+    countries <- sort(unique(df[[cols$country]]))
+    
+    if (length(countries) == 0) {
+      return(p("Aucun pays disponible", style = "color: red;"))
+    }
+    
+    selectInput("countries",
+                "Pays à afficher:",
+                choices = countries,
+                selected = c("FRA", "USA"),
+                multiple = TRUE)
+  })
+  
+  output$titre_carte <- renderText({
+    req(input$annee_map)
+    paste("Indicateur :", input$indicateur, "en", input$annee_map)
+  })
+  
+  output$titre_graph <- renderText({
+    cols <- columns()
+    paste("Indicateur :", input$indicateur)
+  })
+  
+  donnees_carte <- reactive({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols, input$annee_map)
+    
+    df_annee <- df %>%
+      filter(.data[[cols$time]] == as.character(input$annee_map)) %>%
+      group_by(.data[[cols$country]]) %>%
+      summarise(valeur = mean(.data[[cols$value]], na.rm = TRUE), .groups = "drop")
+    
+    names(df_annee)[1] <- "country_code"
+    
+    world %>%
+      left_join(df_annee, by = c("wb_a3" = "country_code"))
+  })
+  
+  output$carte <- renderLeaflet({
+    map_data <- donnees_carte()
+    req(map_data)
+    
+    range_global <- global_range()
+    valeurs_valides <- map_data$valeur[is.finite(map_data$valeur)]
+    
+    if(length(valeurs_valides) == 0) {
+      leaflet() %>%
+        addProviderTiles(providers$CartoDB.Positron) %>%
+        setView(lng = 0, lat = 20, zoom = 2)
+    } else {
+      pal <- colorNumeric(
+        palette = "RdYlGn",
+        domain = range_global,
+        na.color = "grey"
+      )
+      
+      leaflet(map_data) %>%
+        addProviderTiles(providers$CartoDB.Positron) %>%
+        setView(lng = 0, lat = 20, zoom = 2) %>%
+        addPolygons(
+          fillColor = ~pal(valeur),
+          fillOpacity = 0.9,
+          color = "white",
+          weight = 1,
+          label = ~ifelse(is.finite(valeur),
+                          paste0(name, ": ", round(valeur, 2)),
+                          paste0(name, ": Pas de données")),
+          
+          highlightOptions = highlightOptions( # pour encadrer les pays quand on passe dessus
+            weight = 2,
+            color = "black",
+            bringToFront = TRUE
+          )
+        ) %>%
+        addLegend(
+          pal = pal,
+          values = range_global,
+          title = paste0(get_unit()),
+          position = "bottomright"
+        )
+    }
+  })
+  
+  output$graphique_evolution <- renderPlot({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols, input$countries)
+    
+    plot_data <- df %>%
+      filter(.data[[cols$country]] %in% input$countries) %>%
+      mutate(year = as.numeric(.data[[cols$time]])) %>%
+      group_by(.data[[cols$country]], year) %>%
+      summarise(value = mean(as.numeric(.data[[cols$value]]), na.rm = TRUE), .groups = "drop")
+    
+    if (nrow(plot_data) == 0) {
+      plot.new()
+      text(0.5, 0.5, "Pas de données disponibles", cex = 1.5)
+      return()
+    }
+    
+    ggplot(plot_data, aes(
+      x = year,
+      y = value,
+      color = .data[[cols$country]]
+    )) +
+      geom_line(linewidth = 1.5) +
+      geom_point(size = 3.5, shape = 21, stroke = 1, fill = "white") +
+      labs(
+        x = "Année",
+        y = paste0(get_unit()),
+        color = "Pays",
+        title = "Dynamique temporelle par pays"
+      ) +
+      scale_color_brewer(palette = "Set2") + 
+      theme_minimal(base_size = 16) +
+      theme(
+        
+        axis.title.x = element_text(face = "bold", size = 18, margin = margin(t = 15)),
+        axis.title.y = element_text(face = "bold", size = 18, margin = margin(r = 15)),
+        axis.text = element_text(size = 14),
+        
+        
+        plot.title = element_text(face = "bold", hjust = 0.5, size = 22, margin = margin(b = 20)),
+        
+        legend.position = "top",
+        legend.title = element_text(face = "bold", size = 16),
+        legend.text = element_text(size = 14),
+        legend.key.width = unit(2, "cm"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.margin = margin(b = 15),
+        
+        # Grilles et axes
+        axis.line = element_line(color = "grey40", linewidth = 0.8),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey85", linewidth = 0.5),
+        
+        # Marges générales
+        plot.margin = margin(20, 20, 20, 20)
+      )
+    
+  })
+  
+  output$n_lignes <- renderText({
+    nrow(data())
+  })
+  
+  output$n_colonnes <- renderText({
+    ncol(data())
+  })
+  
+  output$n_pays <- renderText({
+    df <- data()
+    cols <- columns()
+    req(df, cols)
+    length(unique(df[[cols$country]]))
+  })
+  
+  output$n_annees <- renderText({
+    df <- data()
+    cols <- columns()
+    req(df, cols)
+    length(unique(df[[cols$time]]))
+  })
+  
+  output$n_indicateurs <- renderText({
+    df <- data()
+    cols <- columns()
+    req(df, cols)
+    length(unique(df[[cols$indicators]]))
+  })
+  
+  output$plage_temporelle <- renderText({
+    df <- data()
+    cols <- columns()
+    req(df, cols)
+    annees <- as.numeric(df[[cols$time]])
+    annees <- annees[!is.na(annees)]
+    if (length(annees) > 0) {
+      paste0(min(annees), " - ", max(annees))
+    } else {
+      "-"
+    }
+  })
+  
+  output$data_preview <- renderTable({
+    head(data(), 10)
+  })
+  
+  # Préparer les données wide
+  data_wide <- reactive({
+    req(data(), columns(),input$annee_na)
+    prepare_wide_data(data(), columns(), input$annee_na)
+  })
+  
+  # Graphique principal
+  output$missing_plot <- renderPlot({
+    req(data_wide())
+    aggr(data_wide(), only.miss = TRUE, sortVar = TRUE)
+  })
+  
+  output$missing_summary <- renderPrint({
+    req(data_wide())
+    invisible_res <- invisible(summary(aggr(data_wide(), prop = TRUE, combined = TRUE)))
+    res <- invisible_res$combinations
+    res[rev(order(res[,1])),]
+  })
 }
+    
+
+    
+    
+    
 

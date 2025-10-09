@@ -1,251 +1,4 @@
-library(shiny)
-library(ggplot2)
-library(dplyr)
-library(leaflet)
-library(rnaturalearth)
-library(sf)
-library(countrycode)
-library(rsdmx)
-library(bslib)
-library(tidyverse)
-library(VIM)
-library(bsicons)
-
-
-# Charger la carte du monde pour la visualisation
-world <- ne_countries(scale = "medium", returnclass = "sf")
-
-preloaded_datasets <- list.files("data_only/", pattern = "\\.rds$", full.names = FALSE)
-
-
-# But : trouve automatiquement les colonnes d'intérêt issue du jeu de données
-# Entrée : le jeu de données brut
-# Sortie : une liste avec comme nom : "time"       "country"    "value"      "unit"       "indicators"
-
-
-identify_columns <- function(df) {
-  cols <- list()
-  
-  # Trouver la colonne temps (année)
-  time_candidates <- c("TIME_PERIOD", "TIME", "YEAR", "obsTime")
-  cols$time <- intersect(names(df), time_candidates)[1]
-  
-  # Trouver la colonne pays
-  country_candidates <- c("REF_AREA", "COUNTRY", "LOCATION")
-  cols$country <- intersect(names(df), country_candidates)[1]
-  
-  # Trouver la colonne valeur (les données numériques)
-  value_candidates <- c("obsValue", "OBS_VALUE", "VALUE")
-  cols$value <- intersect(names(df), value_candidates)[1]
-  
-  # Trouver la colonne unité
-  unit_candidates <- c("UNIT_MEASURE", "UNIT", "UNITS", "Unit.of.measure", "Unité.de.mesure")
-  cols$unit <- intersect(names(df), unit_candidates)[1]
-  
-  # Trouver les colonnes indicateurs (pour filtrer les données)
-  indicator_candidates <- c("MEASURE", "INDICATOR", "VARIABLE", "SUBJECT", "Measure")
-  cols$indicators <- intersect(names(df), indicator_candidates)[1]
-  
-  return(cols)
-}
-
-validate_columns <- function(cols, df) {
-  errors <- c()
-  # Vérifier les colonnes obligatoires
-  if (is.null(cols$time) || !cols$time %in% names(df)) {
-    errors <- c(errors, "Colonne temps/année non trouvée")
-  }
-  if (is.null(cols$country) || !cols$country %in% names(df)) {
-    errors <- c(errors, "Colonne pays non trouvée")
-  }
-  if (is.null(cols$value) || !cols$value %in% names(df)) {
-    errors <- c(errors, "Colonne valeur non trouvée")
-  }
-  if (is.null(cols$indicators) || !cols$indicators %in% names(df)) {
-    errors <- c(errors, "Colonne indicateur non trouvée")
-  }
-  # Retourner les erreurs s'il y en a
-  if (length(errors) > 0) {
-    return(list(valid = FALSE, errors = errors))
-  }
-  
-  return(list(valid = TRUE, errors = NULL))
-}
-
-
-# Préparer les données au format wide (une colonne par indicateur)
-prepare_wide_data <- function(df, cols) {
-  indicator_col <- cols$indicators
-  
-  df_wide <- df %>%
-    select(cols$time, cols$country, indicator_col, cols$value) %>%
-    # Gérer les doublons en prenant la moyenne
-    group_by(across(c(cols$time, cols$country, indicator_col))) %>%
-    summarise(value = mean(get(cols$value), na.rm = FALSE), .groups = "drop") %>%
-    pivot_wider(
-      names_from = indicator_col,
-      values_from = value
-    )
-  
-  return(df_wide)
-}
-
-
-ui <- fluidPage(
-  br(),
-  titlePanel("Visualisation des données OCDE"),
-  br(),
-  theme = bs_theme(
-    bootswatch = "minty",
-    base_font = font_google("Inter"),
-    navbar_bg = "#25443B"
-  ),
-  sidebarLayout( # séparé en deux : le sidebar panel avec les selecteurs et le main panel avec la carte et les graphs
-    sidebarPanel(
-      width = 3,
-      card(
-        card_header("Données et indicateurs"),
-        card_body(
-      # Pré chargés ou issus d'URL : --> on traite ça avec les conditionnal pannel
-      radioButtons("mode", "Source des données:",
-                   choices = c("Datasets pré-chargés" = "preloaded",
-                               "URL personnalisée" = "custom")),
-      
-      # Si dataset pré-chargé : menu déroulant
-      conditionalPanel(
-        condition = "input.mode == 'preloaded'",  # voir doc conditional pannel
-        selectInput("dataset_preloaded", "Jeu de données:",
-                    choices = preloaded_datasets)
-      ),
-      
-      # Si URL personnalisée : zone de texte + bouton
-      conditionalPanel(
-        condition = "input.mode == 'custom'",
-        textAreaInput("custom_url", "URL SDMX OCDE:",
-                      value = "", rows = 3,
-                      placeholder = "Collez l'URL ici..."),
-        textInput("file_name", "Nom du fichier", value = "fichier"),
-        actionButton("load_url", "Charger", class = "btn-success"), # comme dans la doc
-      ),
-      
-      hr(),
-      
-      # Sélecteur d'indicateur dynamique
-      uiOutput("indicator_ui"),
-      
-      hr(),
-      helpText("Source: API SDMX OCDE")))
-    ),
-    
-    mainPanel(
-      width = 9,
-      tabsetPanel(
-        tabPanel("Carte",
-                 # Curseur dynamique pour l'année
-                 card(
-                   card_header(textOutput("titre_carte")),
-                   card_body(uiOutput("year_ui")),
-                   
-                 leafletOutput("carte", height = 450),
-                 br()
-        )),
-        
-        tabPanel(
-          "Évolution temporelle",
-          br(),
-          fluidRow(
-            column(
-              width = 10,
-              card(
-                card_header(textOutput("titre_graph")),
-                plotOutput("graphique_evolution", height = 450)
-              )
-            ),
-            column(
-              width = 2,
-                  hr(),
-                  uiOutput("country_selector")
-            )
-          )
-        ),
-        
-        tabPanel("Aperçu",
-                 card(
-                   card_header("Structure du jeu de données"),
-                   card_body(
-                     layout_columns(
-                       fill = FALSE,
-                       value_box(
-                         title = "Nombre de lignes",
-                         value = textOutput("n_lignes"),
-                         showcase = bsicons::bs_icon("list-ol")
-                       ),
-                       value_box(
-                         title = "Nombre de colonnes",
-                         value = textOutput("n_colonnes"),
-                         showcase = bsicons::bs_icon("columns-gap")
-                       ),
-                       value_box(
-                         title = "Nombre de pays",
-                         value = textOutput("n_pays"),
-                         showcase = bsicons::bs_icon("globe")
-                       ),
-                       value_box(
-                         title = "Nombre d'années",
-                         value = textOutput("n_annees"),
-                         showcase = bsicons::bs_icon("calendar3")
-                       ),
-                       value_box(
-                         title = "Nombre d'indicateurs",
-                         value = textOutput("n_indicateurs"),
-                         showcase = bsicons::bs_icon("bar-chart")
-                       ),
-                       value_box(
-                         title = "Plage temporelle",
-                         value = textOutput("plage_temporelle"),
-                         showcase = bsicons::bs_icon("clock")
-                       )
-                     )),
-                   br(),
-                   h4("Aperçu des données"),
-                   card(
-                     full_screen = TRUE,
-                     card_header("10 premières lignes :"),
-                     card_body(
-                       tableOutput("data_preview")
-                     )
-                   ))
-        ),
-        tabPanel("Données manquantes",
-                 br(),
-                 card(
-                   full_screen = TRUE,
-                    card_header("NA plot"),
-                    card_body(
-                      plotOutput("missing_plot", height = "600px"))),
-                  br(),
-                 card(
-                   full_screen = TRUE,
-                   card_header("Résumé des NA"),
-                   card_body(verbatimTextOutput("missing_summary")))
-        )
-        
-        
-      )
-    )
-  )
-)
-
-
-# Enable thematic
-thematic::thematic_shiny(font = "auto")
-
-# Change ggplot2's default "gray" theme
-theme_set(theme_bw(base_size = 16))
-
-
-
-server <- function(input, output, session) {
+server_accueil <- function(input, output, session) {
   
   # Stockage des données chargées depuis une URL
   custom_data <- reactiveVal(NULL)
@@ -262,7 +15,7 @@ server <- function(input, output, session) {
       sdmx_data <- readSDMX(input$custom_url)
       df <- as.data.frame(sdmx_data)
       # Sauvegarder dans le fichier des datasets préchargés
-      saveRDS(df, file = paste0("data_only", input$file_name, ".rds"))
+      saveRDS(df, file = paste0("../Data/", input$file_name, ".rds"))
       
       
       # Identifier et valider les colonnes
@@ -292,7 +45,7 @@ server <- function(input, output, session) {
   data <- reactive({
     if (input$mode == "preloaded") {
       req(input$dataset_preloaded)
-      readRDS(file.path("data_only", input$dataset_preloaded))
+      readRDS(file.path("../Data/", input$dataset_preloaded))
     } else {
       req(custom_data())
       custom_data()
@@ -332,7 +85,7 @@ server <- function(input, output, session) {
     req(df, cols)
     
     indicators <- unique(df[[cols$indicators]])
-      
+    
     selectInput("indicateur",
                 "Indicateur:",
                 choices = indicators,
@@ -366,7 +119,7 @@ server <- function(input, output, session) {
     df <- data()
     cols <- columns()
     req(df, cols, cols$indicators, input$indicateur)
-
+    
     df <- df %>% filter(.data[[cols$indicators]] == input$indicateur)
   })
   
@@ -426,8 +179,8 @@ server <- function(input, output, session) {
   })
   
   output$titre_graph <- renderText({
-      cols <- columns()
-      paste("Indicateur :", input$indicateur)
+    cols <- columns()
+    paste("Indicateur :", input$indicateur)
   })
   
   donnees_carte <- reactive({
@@ -601,5 +354,3 @@ server <- function(input, output, session) {
     res[rev(order(res[,2])),]
   })
 }
-
-shinyApp(ui = ui, server = server)
