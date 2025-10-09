@@ -1,6 +1,7 @@
 
 source("UI_Fluid_Raw_Moïse.R")
 source("fluid_page_jules.R")
+source("fluid_page_tom.R")
 library(shiny)
 library(leaflet)
 library(data.table)
@@ -25,9 +26,7 @@ ui <- navbarPage(
   
   # --- Analyse temporelle ---
   tabPanel("Analyse temporelle",
-           fluidPage(
-             h2("Analyse temporelle des indicateurs de santé"),
-             p("À construire...")
+           fluidPage((fluid_tempo)
            )))
 
 
