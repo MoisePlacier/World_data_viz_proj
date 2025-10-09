@@ -136,11 +136,6 @@ save(finance_sante_wide, file = "../data/finance_sante_wide.RData")
 ```{r}
 Mortalite_evitable <- dt[Tableau == "Mortalite_evitable"]
 
-
-## Selection de Unit.of.measure
-
-
-
 Mortalite_evitable <- Mortalite_evitable[!(Unit.of.measure %in% c("deaths"))]
 
 Mortalite_evitable_summary <- Mortalite_evitable[, 
@@ -166,7 +161,10 @@ save(Mortalite_evitable_wide, file = "../data/Mortalite_evitable_wide.RData")
 
 ```{r}
 ressources_Sante <- dt[Tableau == "Ressources_Sante"]
+```
 
+
+```{r}
 ## Identification des modalité professions à conserver 
 
 ### sur le critè dont OBS_Value = 0 
@@ -748,6 +746,8 @@ saveRDS(Labels_dict_wide, file = "../data/Labels_dict.rds")
 #  Parition et calcul des scores
 
 
+
+
 ```{r}
 vars_groupes <- list(
   mortalite_evitable = c(
@@ -797,15 +797,11 @@ vars_groupes <- list(
 )
 ```
 
-# save groupes de variables pour scores 
-```{r}
-saveRDS(vars_groupes, file = "../data/vars_groupes_scores.rds")
-```
-
-
 ```{r}
 # --- 2. Définir si chaque groupe est à maximiser ou minimiser ----
 # TRUE = plus c’est haut, mieux c’est ; FALSE = plus c’est bas, mieux c’est
+
+
 
 orientation <- list(
   mortalite_evitable = FALSE,
@@ -814,6 +810,11 @@ orientation <- list(
   esperance_de_vie = TRUE
 )
 ```
+# save groupes de variables pour scores 
+```{r}
+saveRDS(vars_groupes, file = "../data/vars_groupes_scores.rds")
+```
+
 
 
 $$\tilde{x}{ij} =
@@ -835,6 +836,18 @@ $$
 Dans le cas où tous les groupes ont le même poids, la formule se simplifie en : 
 
 $$S_{i}^{\text{global}} = \frac{1}{G} \sum_{g=1}^G S_i(g)$$
+
+
+
+
+```{r}
+vars_groupes <- list(
+  c("Mortalité évitable pour 100 000 habitants",
+              "Emploi en santé pour 1000 habitants",
+              "Hospitalisations/mortalité évitables pour 1000 patients",
+              "esperance de vie")
+)
+```
 
 
 ```{r}
@@ -899,30 +912,30 @@ saveRDS(scores, file = "../data/scores_globaux.rds")
 
 
 ```{r}
-selectInput("score_dim", "Dimension :", 
-            choices = names(vars_groupes_scores),
-            selected = "score_global")
-```
-
-
-```{r}
-geo_sf <- merge(geo_sf, scores, by = "REF_AREA", all.x = TRUE)
+scores_global <- readRDS("../Data/scores_globaux.rds")
+scores_global <- as.data.table(scores_global)
 ```
 
 ```{r}
-geo_sf$qualite_soins
+names(scores_global)
+vars_groupes <- 
+  c("REF_AREA","Mortalité évitable pour 100 000 habitants",
+              "Emploi en santé pour 1000 habitants",
+              "Hospitalisations/mortalité évitables pour 1000 patients",
+              "esperance de vie","score_global")
+
 ```
 
+```{r}
+setnames(scores_global, old = names(scores_global), new = vars_groupes)
+
+```
 
 ```{r}
-pal <- colorNumeric("RdYlGn", domain = geo_sf$qualite_soins, na.color = "grey90")
+names(scores_global)
+```
 
-leafletProxy("map") %>%
-  clearShapes() %>%
-  addPolygons(
-    data = geo_sf,
-    fillColor = ~pal,
-    label = ~paste0(sovereignt, ": ", round(qualite_soins, 2))
-  )
+```{r}
+saveRDS(scores_global, file = "../data/scores_globaux.rds")
 ```
 

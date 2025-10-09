@@ -14,6 +14,7 @@ source("Plots.R")
 source("server_jules.R")
 source("fonctions_jules.R")
 library(DT)
+library(shinyBS) 
 # Enable thematic
 thematic::thematic_shiny(font = "auto")
 
@@ -39,7 +40,7 @@ setnames(dt, old = dict$var_full, new = dict$var_label_fr)
 ###################################
 # Filtrer le fond de carte
 filtre <- dt$REF_AREA
-geo_sf <- geo_sf[geo_sf$gu_a3 %in% filtre, ]
+geo_sf <- geo_sf[geo_sf$gu_a3 %in% filtre,]
 # Ajouter une colonne REF_AREA 
 geo_sf$REF_AREA <- geo_sf$gu_a3
 ########################################
@@ -104,7 +105,8 @@ function(input, output, session){
     
     else if (input$viz_mode == "Visualiser les scores de performances de santé des pays") {
       if (input$score_var != "score_global") {
-        vars_for_scores <- unique(vars_groupes_scores[[input$score_var]])
+        vars_for_scores <- dict[var_group == input$score_var, var_label_fr]
+        #vars_for_scores <- unique(vars_groupes_scores[[input$score_var]])
       } else {
         # Toutes les variables de toutes les colonnes
         vars_for_scores <- unique(unlist(vars_groupes_scores))
@@ -123,6 +125,18 @@ function(input, output, session){
 
   
   ############## Carte initiale ###################
+  # output$map <- renderLeaflet({
+  #   leaflet(geo_sf) %>%
+  #     addTiles() %>%
+  #     addPolygons(
+  #       layerId = ~REF_AREA,
+  #       fillColor = "lightgrey",
+  #       fillOpacity = 0.7,
+  #       color = "white",
+  #       weight = 0.5,
+  #       label = ~sovereignt
+  #     )
+  # })
   output$map <- renderLeaflet({
     leaflet(geo_sf) %>%
       addTiles() %>%
@@ -132,10 +146,14 @@ function(input, output, session){
         fillOpacity = 0.7,
         color = "white",
         weight = 0.5,
-        label = ~sovereignt
+        label = ~sovereignt,
+        labelOptions = labelOptions(
+          direction = "auto",
+          sticky = TRUE,    # <--- fait que le label reste affiché
+          textsize = "12px"
+        )
       )
   })
-  
   
   ###############################################################
   ###### Mise à jour de la carte ##############################
@@ -174,9 +192,48 @@ function(input, output, session){
   
 
   
+  observeEvent(input$help_score, {
+    showModal(modalDialog(
+      title = "Détails du calcul des scores",
+      size = "l", 
+      easyClose = TRUE,
+      withMathJax(
+      HTML('
+      <p>Normalisation des variables :</p>
+      $$\\tilde{x}_{ij} =
+      \\begin{cases}
+      \\frac{x_{ij} - \\min(\\mathbf{x}_j)}{\\max(\\mathbf{x}_j) - \\min(\\mathbf{x}_j)} & \\text{si $x_j$ est à maximiser}, \\\\
+      \\frac{\\max(\\mathbf{x}_j) - x_{ij}}{\\max(\\mathbf{x}_j) - \\min(\\mathbf{x}_j)} & \\text{si $x_j$ est à minimiser.}
+      \\end{cases}$$
+      
+      <p>Score par groupe :</p>
+      $$S_i(g) = \\frac{1}{p_g} \\sum_{j \\in g} \\tilde{x}_{ij}$$
+      
+      <p>Score global :</p>
+      $$S_{i}^{\\text{global}} = \\frac{1}{G} \\sum_{g=1}^G S_i(g)$$
+      ')),
+      footer = modalButton("Fermer")
+    ))
+  })
   
-  
-  
+  observeEvent(input$help_similarity, {
+    showModal(modalDialog(
+      title = "Calcul du score de similarité",
+      withMathJax(
+        helpText(
+          "La similarité entre le pays de référence et le pays i est définie par la distance euclidienne inversée :",
+          "$$ S_i = \\frac{1}{1 + \\sqrt{\\sum_{j \\in V} (x_{ref,j} - x_{i,j})^2}} $$",
+          "où :",
+          "$$V$$ est l'ensemble des variables sélectionnées pour la comparaison,",
+          "$$x_{ref,j}$$ est la valeur de la variable $$j$$ pour le pays de référence,",
+          "$$x_{i,j}$$ est la valeur de la variable $$j$$ pour le pays $$i$$.",
+          "Cette formule garantit que $$S_i \\in (0,1]$$, avec $$S_i = 1$$ si le pays i est identique au pays de référence pour toutes les variables."
+        )
+      ),
+      easyClose = TRUE,
+      footer = modalButton("Fermer")
+    ))
+  })
   
   
   
@@ -213,6 +270,43 @@ function(input, output, session){
     })
   })
   
+  
+  
+  
+  
+  ##########################
+  # ---- Super plot ----
+  ##########################
+  observeEvent(
+    list(input$ref_country_S, input$map_shape_click, input$var_group, input$choix_affichage),
+    {
+      clicked <-input$map_shape_click$id
+      req(input$ref_country_S,clicked, input$var_group)
+      
+      # Pays de comparaison au clic (ISO3)
+      ref_country <- input$ref_country_S
+      
+      
+      clicked <- geo_sf %>%
+        filter(REF_AREA == clicked ) %>%
+        pull(sovereignt)
+      
+      vars_for_comp <- dict[var_group == input$var_group, var_label_fr]
+
+      render_super_plot(
+        output,
+        output_id = "super_plot",
+        dt = dt,
+        dict = dict,
+        scores_global = scores_global,
+        geo_sf = geo_sf,
+        ref_country = ref_country,
+        comp_country = clicked,
+        vars_groupe = vars_for_comp,
+        user_choice = input$choix_affichage
+      )
+    }
+  )
   
   
   #############################################################################
