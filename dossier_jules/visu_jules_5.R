@@ -74,14 +74,14 @@ validate_columns <- function(cols, df) {
 }
 
 
-# Préparer les données au format wide (une colonne par indicateur)
-prepare_wide_data <- function(df, cols) {
+prepare_wide_data <- function(df, cols, year_input) {
   indicator_col <- cols$indicators
   
   df_wide <- df %>%
-    select(cols$time, cols$country, indicator_col, cols$value) %>%
+    filter(.data[[cols$time]] == year_input) %>%
+    select(cols$country, indicator_col, cols$value) %>%
     # Gérer les doublons en prenant la moyenne
-    group_by(across(c(cols$time, cols$country, indicator_col))) %>%
+    group_by(across(c(cols$country, indicator_col))) %>%
     summarise(value = mean(get(cols$value), na.rm = FALSE), .groups = "drop") %>%
     pivot_wider(
       names_from = indicator_col,
@@ -94,10 +94,10 @@ prepare_wide_data <- function(df, cols) {
 
 ui <- fluidPage(
   br(),
-  titlePanel("Visualisation des données OCDE"),
+  titlePanel("Explorateur de données de l'OCDE"),
   br(),
   theme = bs_theme(
-    bootswatch = "darkly",
+    bootswatch = "minty",
     base_font = font_google("Inter"),
     navbar_bg = "#25443B"
   ),
@@ -145,7 +145,7 @@ ui <- fluidPage(
                  # Curseur dynamique pour l'année
                  card(
                    card_header(textOutput("titre_carte")),
-                   card_body(uiOutput("year_ui")),
+                   card_body(uiOutput("year_map_ui")),
                    
                  leafletOutput("carte", height = 450),
                  br()
@@ -208,7 +208,7 @@ ui <- fluidPage(
                        )
                      )),
                    br(),
-                   h4("Aperçu des données"),
+                   h4("Jeu de données brutes"),
                    card(
                      full_screen = TRUE,
                      card_header("10 premières lignes :"),
@@ -219,15 +219,16 @@ ui <- fluidPage(
         ),
         tabPanel("Données manquantes",
                  br(),
+                 uiOutput("year_na_ui"),
                  card(
                    full_screen = TRUE,
-                    card_header("NA plot"),
+                    card_header("Structure des données manquantes : fréquence et combinaisons"),
                     card_body(
                       plotOutput("missing_plot", height = "600px"))),
                   br(),
                  card(
                    full_screen = TRUE,
-                   card_header("Résumé des NA"),
+                   card_header("Résumé"),
                    card_body(verbatimTextOutput("missing_summary")))
         )
         
@@ -262,7 +263,7 @@ server <- function(input, output, session) {
       sdmx_data <- readSDMX(input$custom_url)
       df <- as.data.frame(sdmx_data)
       # Sauvegarder dans le fichier des datasets préchargés
-      saveRDS(df, file = paste0("data/", input$file_name, ".rds"))
+      saveRDS(df, file = paste0("../Data/", input$file_name, ".rds"))
       
       
       # Identifier et valider les colonnes
@@ -292,7 +293,7 @@ server <- function(input, output, session) {
   data <- reactive({
     if (input$mode == "preloaded") {
       req(input$dataset_preloaded)
-      readRDS(file.path("data", input$dataset_preloaded))
+      readRDS(file.path("../Data/", input$dataset_preloaded))
     } else {
       req(custom_data())
       custom_data()
@@ -325,6 +326,7 @@ server <- function(input, output, session) {
     cols
   })
   
+  
   # Créé dynamiquement si la colonne indicateur existe
   output$indicator_ui <- renderUI({
     df <- data()
@@ -340,7 +342,7 @@ server <- function(input, output, session) {
     
   })
   
-  output$year_ui <- renderUI({
+  output$year_map_ui <- renderUI({
     df <- data_filtered()
     cols <- columns()
     req(df, cols)
@@ -353,13 +355,34 @@ server <- function(input, output, session) {
       return(p("Aucune année disponible", style = "color: red;"))
     }
     
-    sliderInput("annee", "Année:",
+    sliderInput("annee_map", "Sélectionner une année :",
                 min = min(annees),
                 max = max(annees),
                 value = max(annees),
                 step = 1,
                 sep = "")
   })
+  
+  
+  output$year_na_ui <- renderUI({
+    df <- data_filtered()
+    cols <- columns()
+    req(df, cols)
+    annees <- sort(unique(as.numeric(df[[cols$time]])))
+    annees <- annees[!is.na(annees)]
+    
+    if (length(annees) == 0) {
+      return(p("Aucune année disponible", style = "color: red;"))
+    }
+    
+    sliderInput("annee_na", "Sélectionner une année :",
+                min = min(annees),
+                max = max(annees),
+                value = max(annees),
+                step = 1,
+                sep = "")
+  })
+  
   
   
   data_filtered <- reactive({
@@ -379,7 +402,7 @@ server <- function(input, output, session) {
     if (!is.null(cols$unit)) {
       unit <- unique(df[[cols$unit]])[1]
       if (!is.na(unit) && unit != "") {
-        return(paste0(" (", unit, ")"))
+        return(paste0(unit))
       }
     }
     return("")
@@ -421,8 +444,8 @@ server <- function(input, output, session) {
   })
   
   output$titre_carte <- renderText({
-    req(input$annee)
-    paste("Indicateur :", input$indicateur, "en", input$annee)
+    req(input$annee_map)
+    paste("Indicateur :", input$indicateur, "en", input$annee_map)
   })
   
   output$titre_graph <- renderText({
@@ -433,10 +456,10 @@ server <- function(input, output, session) {
   donnees_carte <- reactive({
     df <- data_filtered()
     cols <- columns()
-    req(df, cols, input$annee)
+    req(df, cols, input$annee_map)
     
     df_annee <- df %>%
-      filter(.data[[cols$time]] == as.character(input$annee)) %>%
+      filter(.data[[cols$time]] == as.character(input$annee_map)) %>%
       group_by(.data[[cols$country]]) %>%
       summarise(valeur = mean(.data[[cols$value]], na.rm = TRUE), .groups = "drop")
     
@@ -513,60 +536,74 @@ server <- function(input, output, session) {
       y = value,
       color = .data[[cols$country]]
     )) +
-      geom_line(linewidth = 1.2) +
-      geom_point(size = 3, shape = 21, stroke = 0.8, fill = "white") +  # petits points avec bord
+      geom_line(linewidth = 1.5) +
+      geom_point(size = 3.5, shape = 21, stroke = 1, fill = "white") +
       labs(
         x = "Année",
         y = paste0(get_unit()),
-        color = "Pays"
+        color = "Pays",
+        title = "Dynamique temporelle par pays"
       ) +
-      labs(title = "Evolution temporelle de l'indicateur") +
       scale_color_brewer(palette = "Set2") + 
-      theme_minimal(base_size = 14) +
+      theme_minimal(base_size = 16) +
       theme(
-        axis.title = element_text(face = "bold"),           # titres en gras
-        axis.line = element_line(color = "grey40"),         # lignes axes 
-        panel.grid.minor = element_blank(),                # grille mineure 
-        panel.grid.major = element_line(color = "grey80"), # grille majeure 
-        legend.position = "top",                            # légende en haut
-        legend.title = element_text(face = "bold"),         # titre légende en gras
-        legend.key = element_rect(fill = "transparent"),   # fond légende transparent
-        plot.title = element_text(face = "bold", hjust = 0.5)
+
+        axis.title.x = element_text(face = "bold", size = 18, margin = margin(t = 15)),
+        axis.title.y = element_text(face = "bold", size = 18, margin = margin(r = 15)),
+        axis.text = element_text(size = 14),
+        
+
+        plot.title = element_text(face = "bold", hjust = 0.5, size = 22, margin = margin(b = 20)),
+        
+        legend.position = "top",
+        legend.title = element_text(face = "bold", size = 16),
+        legend.text = element_text(size = 14),
+        legend.key.width = unit(2, "cm"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.margin = margin(b = 15),
+        
+        # Grilles et axes
+        axis.line = element_line(color = "grey40", linewidth = 0.8),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey85", linewidth = 0.5),
+        
+        # Marges générales
+        plot.margin = margin(20, 20, 20, 20)
       )
     
   })
   
   output$n_lignes <- renderText({
-    nrow(data_filtered())
+    nrow(data())
   })
   
   output$n_colonnes <- renderText({
-    ncol(data_filtered())
+    ncol(data())
   })
   
   output$n_pays <- renderText({
-    df <- data_filtered()
+    df <- data()
     cols <- columns()
     req(df, cols)
     length(unique(df[[cols$country]]))
   })
   
   output$n_annees <- renderText({
-    df <- data_filtered()
+    df <- data()
     cols <- columns()
     req(df, cols)
     length(unique(df[[cols$time]]))
   })
   
   output$n_indicateurs <- renderText({
-    df <- data_filtered()
+    df <- data()
     cols <- columns()
     req(df, cols)
     length(unique(df[[cols$indicators]]))
   })
   
   output$plage_temporelle <- renderText({
-    df <- data_filtered()
+    df <- data()
     cols <- columns()
     req(df, cols)
     annees <- as.numeric(df[[cols$time]])
@@ -579,13 +616,13 @@ server <- function(input, output, session) {
   })
   
   output$data_preview <- renderTable({
-    head(data_filtered(), 10)
+    head(data(), 10)
   })
   
   # Préparer les données wide
   data_wide <- reactive({
-    req(data(), columns())
-    prepare_wide_data(data(), columns())
+    req(data(), columns(),input$annee_na)
+    prepare_wide_data(data(), columns(), input$annee_na)
   })
   
   # Graphique principal
@@ -594,12 +631,12 @@ server <- function(input, output, session) {
     aggr(data_wide(), only.miss = TRUE, sortVar = TRUE)
   })
   
-  # Résumé détaillé
   output$missing_summary <- renderPrint({
     req(data_wide())
-    res <- summary(aggr(data_wide(), prop = TRUE, combined = TRUE))$combinations
-    res[rev(order(res[,2])),]
+    invisible_res <- invisible(summary(aggr(data_wide(), prop = TRUE, combined = TRUE)))
+    res <- invisible_res$combinations
+    res[rev(order(res[,1])),]
   })
+  
 }
-
 shinyApp(ui = ui, server = server)
