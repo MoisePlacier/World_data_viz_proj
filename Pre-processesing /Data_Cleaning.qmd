@@ -4,7 +4,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 dta_health <- readRDS("../data/dta_health.rds")
 dta_pib <- readRDS("../data/dta_pib.rds")
@@ -20,12 +19,9 @@ dta_finance <- read.csv("../data/Raw_Financement_health.csv")
 
 ```
 
-
-
 ```{r}
 table(dta_medicament$Measure)
 ```
-
 
 ```{r}
 library(data.table)
@@ -42,16 +38,15 @@ dta_qualite_soins <- data.table(dta_qualite_soins)
 dta_agri <- data.table(dta_agri)
 dta_finance <- data.table(dta_finance)
 ```
+
 ```{r}
 dta_mortalite_evitable <- readRDS("../data/dta_mortalite_evitable.rds")
 table(dta_mortalite_evitable$Measure)
 ```
 
-
 ```{r}
 dta_finance
 ```
-
 
 ```{r}
 table(dta_RH_sante$Health.profession, dta_RH_sante$Unit.of.measure)
@@ -89,12 +84,9 @@ dta_mortalite_evitable <- dta_mortalite_evitable[, Tableau := "Mortalite_evitabl
 dta_mortalite_evitable
 ```
 
-
 ```{r}
 dta_mortalite_evitable[Reference.area=="Bulgaria" & TIME_PERIOD == 2017 & Measure == "treatable_mortality"]
 ```
-
-
 
 ```{r}
 dta_agri <- dta_agri[,.(REF_AREA,Reference.area,Measure,TIME_PERIOD,Unit.of.measure,OBS_VALUE)]
@@ -135,6 +127,7 @@ data <- rbindlist(datalist, use.names=TRUE, fill=TRUE)
 ```
 
 # Nettoyage de "Measure"
+
 ```{r}
 library(stringi)
 
@@ -168,8 +161,6 @@ data[, Unit.of.measure := gsub("[^a-z0-9 ]", "", Unit.of.measure)]
 data[, Unit.of.measure := gsub(" +", "_", Unit.of.measure)]
 ```
 
-
-
 ```{r}
 dt[, lapply(.SD, FUN = as.factor) , by = c("OBS_VALUE","TIME_PERIOD")]
 ```
@@ -179,9 +170,6 @@ save(data, file = "../data/data_cleaned.RData")
 
 ```
 
-
-
 ```{r}
 data
 ```
-
