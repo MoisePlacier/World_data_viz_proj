@@ -7,8 +7,12 @@ library(sf)
 library(countrycode)
 library(rsdmx)
 library(bslib)
+
 library(tidyverse)
 library(VIM)
+
+library(bsicons)
+
 
 # Charger la carte du monde pour la visualisation
 world <- ne_countries(scale = "medium", returnclass = "sf")

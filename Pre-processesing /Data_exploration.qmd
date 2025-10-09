@@ -426,7 +426,13 @@ merged_inputed <- data.table(resultat_imputation$completeObs)
 merged_inputed[,REF_AREA := merged[,1]]
 
 setcolorder(merged_inputed, c("REF_AREA", names(merged_inputed)[names(merged_inputed) != "REF_AREA"]))  # placer 'REF_AREA' en premier
+```
 
+
+
+
+
+```{r}
 var_map <- list(
   REF_AREA = "area",
   dep_sante_Admin_administration_sante_publique = "dep_admin_pub",
@@ -505,18 +511,28 @@ var_map <- list(
   QS_Mortalité_Ischaemic_stroke_30_day_mortality = "qs_mort_i_stroke",
   QS_Médication_Second_line_antibiotics_proportion = "qs_abx_2nd"
 )
+```
 
-
+# save du merged wide imputed
+```{r}
 old_names <- names(merged_inputed)
 new_names <- sapply(old_names, function(x) if (x %in% names(dict)) dict[[x]] else x)
 setnames(merged_inputed, old = old_names, new = new_names)
 
-vars <- c("dep_sante_Totale_Depenses_sante","RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers","RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives","QS_Médication_Second_line_antibiotics_proportion")
+vars <- c("dep_sante_Totale_Depenses_sante","RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers","RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives","QS_Médication_Second_line_antibiotics_proportion","RH_Sante_health_and_social_employment_per_1_000_live_births_Midwifes")
 dt_excl <- copy(merged_inputed[, .SD, .SDcols = setdiff(names(merged_inputed), vars)])
 
 
-save(dt_excl, file = "../data/merged_inputed.RData")
 
+saveRDS(dt_excl, file = "../data/merged_imputed.rds")
+```
+
+
+
+
+# création du dictionnaire 
+
+```{r}
 dict <- data.table(
   var_full = c(
     "REF_AREA",
@@ -530,7 +546,7 @@ dict <- data.table(
     "dep_sante_Hopitaux_psychiatriques",
     "dep_sante_Hopitaux_specialises",
     "dep_sante_Hopitaux_total",
-    #"dep_sante_Totale_Depenses_sante",
+
     # Financement / PIB
     "financement_sante_depenses_pourcentage_du_pib_Admin_administration_sante_publique",
     "financement_sante_depenses_pourcentage_du_pib_Admin_services_administratifs",
@@ -541,14 +557,11 @@ dict <- data.table(
     "financement_sante_depenses_pourcentage_du_pib_Hopitaux_psychiatriques",
     "financement_sante_depenses_pourcentage_du_pib_Hopitaux_total",
     "financement_sante_depenses_pourcentage_du_pib_Totale_Depenses_sante",
-    # Mortalité évitable
-    "Mortalite_evitable_avoidable_mortality_deaths_per_100_000_inhabitants",
-    "Mortalite_evitable_preventable_mortality_deaths_per_100_000_inhabitants",
-    "Mortalite_evitable_treatable_mortality_deaths_per_100_000_inhabitants",
-    # Revenus RH santé
+    # Revenus RH santé : vs salaire moyen
     "RH_Sante_annual_income_factor_of_average_annual_wage_General_practitioners",
     "RH_Sante_annual_income_factor_of_average_annual_wage_Hospital_nurses",
     "RH_Sante_annual_income_factor_of_average_annual_wage_Specialist_medical_practitioners",
+    # Revenus RH santé : vs PIB / hab
     "RH_Sante_annual_income_factor_of_gdp_per_capita_General_practitioners",
     "RH_Sante_annual_income_factor_of_gdp_per_capita_Hospital_nurses",
     "RH_Sante_annual_income_factor_of_gdp_per_capita_Specialist_medical_practitioners",
@@ -568,8 +581,11 @@ dict <- data.table(
     "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Psychiatrists",
     "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Specialist_medical_practitioners",
     "RH_Sante_health_and_social_employment_per_1_000_inhabitants_Surgical_group_of_specialists",
-    "RH_Sante_health_and_social_employment_per_1_000_live_births_Midwifes",
     "RH_Sante_health_and_social_employment_per_1_000_live_births_Obstetricians_and_gynaecologists",
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Other_health_service_providers",
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Professional_nurses_and_midwives",
+    "RH_Sante_hospital_employment_per_1_000_inhabitants_Total",
+    
     # Pourcentage emploi RH
     "RH_Sante_health_and_social_employment_percentage_of_employment_Human_health_and_social_work_activities",
     "RH_Sante_health_and_social_employment_percentage_of_workers_in_the_same_health_profession_General_paediatricians",
@@ -585,12 +601,6 @@ dict <- data.table(
     "RH_Sante_health_graduates_per_100_000_inhabitants_Midwifes",
     "RH_Sante_health_graduates_per_100_000_inhabitants_Pharmacists",
     "RH_Sante_health_graduates_per_100_000_inhabitants_Professional_nurses",
-    # Emploi hospitalier
-    "RH_Sante_hospital_employment_per_1_000_inhabitants_Other_health_service_providers",
-    "RH_Sante_hospital_employment_per_1_000_inhabitants_Professional_nurses_and_midwives",
-    "RH_Sante_hospital_employment_per_1_000_inhabitants_Total",
-    #"RH_Sante_hospital_employment_percentage_of_hospital_employment_Other_health_service_providers",
-    #"RH_Sante_hospital_employment_percentage_of_hospital_employment_Professional_nurses_and_midwives",
     # Qualité / sécurité (QS)
     "QS_Mortalité_Cadiac_crisis_30_day_mortality_same_hospital",
     "QS_Hospitalisations_evitables_Asthma_COPD_hospital_admission",
@@ -603,46 +613,29 @@ dict <- data.table(
     "QS_Hospitalisations_evitables_Diabetes_hospital_admission",
     "QS_Mortalité_Haemorrhagic_stroke_30_day_mortality",
     "QS_Mortalité_Ischaemic_stroke_30_day_mortality",
-    #"QS_Médication_Second_line_antibiotics_proportion",
+     # Mortalité évitable
+    "Mortalite_evitable_avoidable_mortality_deaths_per_100_000_inhabitants",
+    "Mortalite_evitable_preventable_mortality_deaths_per_100_000_inhabitants",
+    "Mortalite_evitable_treatable_mortality_deaths_per_100_000_inhabitants",
     "life_expectancy_Life_expectancy_Years"
   )
 )
 
-# Codes courts
-dict[, var_code := c(
-  "area", "dep_admin_pub", "dep_admin_serv", "dep_cab_med", "dep_centre_amb",
-  "dep_pharma", "dep_hosp_gen", "dep_hosp_psy", "dep_hosp_spec", "dep_hosp_tot",
-  "pib_admin_pub", "pib_admin_serv", "pib_cab_med", "pib_centre_amb",
-  "pib_pharma", "pib_hosp_gen", "pib_hosp_psy", "pib_hosp_tot", "pib_sante_tot",
-  "mort_avoid", "mort_prev", "mort_treat", "rev_gp_wage", "rev_nurse_wage",
-  "rev_spec_wage", "rev_gp_gdp", "rev_nurse_gdp", "rev_spec_gdp", "emp_care",
-  "emp_dent", "emp_ped", "emp_gp", "emp_gen_med", "emp_soc", "emp_spec_grp",
-  "emp_mid", "emp_gyne", "emp_pharma", "emp_physio", "emp_nurse", "emp_psy",
-  "emp_spec", "emp_surg", "emp_mid_birth", "emp_gyne_birth", "pct_emp_soc",
-  "pct_ped", "pct_gp", "pct_gen_med", "pct_spec_grp", "pct_gyne", "pct_psy",
-  "pct_spec", "pct_surg", "grad_dent", "grad_mid", "grad_pharma", "grad_nurse",
-  "hosp_emp_other", "hosp_emp_nurse_mid", "hosp_emp_tot", "qs_mort_cardio", "qs_hosp_asthma_copd", "qs_hosp_asthma",
-  "qs_hosp_copd", "qs_hosp_chf", "qs_hosp_chf_htn", "qs_hosp_htn", "qs_amput_diab",
-  "qs_hosp_diab", "qs_mort_h_stroke", "qs_mort_i_stroke", "life_expectancy"
-)]
+
 
 # Attribution des groupes
-dict[, var_group := fifelse(grepl("^dep_sante", var_full), "Dépenses en % du total des dépenses de santé",
-                     fifelse(grepl("^financement_sante", var_full), "Dépenses de santé en % du PIB du pays",
-                     fifelse(grepl("^Mortalite_evitable", var_full), "Mortalité évitable",
-                     fifelse(grepl("income_factor_of_average_annual_wage", var_full), "Revenus professionels de la santé (vs salaire moyen)",
-                     fifelse(grepl("income_factor_of_gdp_per_capita", var_full), "Revenus professionels de la santé (vs PIB/habitant)",
-                     #fifelse(grepl("hospital_employment", var_full), "Emploi hospitalier",
-                     fifelse(grepl("employment", var_full), "Emploi en santé pour 1000 habitants",
-                     fifelse(grepl("graduates", var_full), "Diplômés santé pour 100 000 habitants",
-                     fifelse(grepl("^QS_Hospitalisations_evitables", var_full), "Hospitalisations évitables pour 1000 patients",
-                     fifelse(grepl("^QS_Mortalité", var_full), "Morts en hopital pour 1000 patients",
-                     fifelse(grepl("^QS_Médication", var_full), "antibio de 2nd ligne en hopital pour 1000 patients",
-                     fifelse(grepl("^life_expectancy", var_full), "esperance de vie", 
-                     NA_character_)))))))))))]
+dict[, var_group := c(rep("Pays",1),
+                      rep("Dépenses en % du total des dépenses de santé",9),
+                      rep("Dépenses de santé en % du PIB du pays",9),
+                      rep("Revenus professionels de la santé (vs salaire moyen)",3),
+                      rep("Revenus professionels de la santé (vs PIB/habitant)",3),
+                      rep("Emploi en santé pour 1000 habitants",19),
+                      rep("Répartition des pro de la santé en % des effectifs",9),
+                      rep("Diplômés santé pour 100 000 habitants",4),
+                      rep("Hospitalisations/mortalité évitables pour 1000 patients",11),
+                      rep("Mortalité évitable pour 100 000 habitants",3),
+                      rep("esperance de vie",1))] 
 
-# Libellés lisibles
-dict[, var_label := gsub("_", " ", var_code)]
 
 
 dict[, var_label_fr := c(
@@ -657,7 +650,7 @@ dict[, var_label_fr := c(
   "% alloué aux Hôpitaux psychiatriques", 
   "% alloué aux Hôpitaux spécialisés", 
   "% alloué aux Total hôpitaux", 
-  #"% alloué aux Dépenses totales santé",         # a tej
+
   # Dépenses % PIB
   "dep Admin santé en % du PIB", 
   "dep Services admin en % du PIB", 
@@ -668,18 +661,17 @@ dict[, var_label_fr := c(
   "dep Hôpitaux psychiatriques en % du PIB", 
   "dep Hôpitaux totaux en % du PIB", 
   "dep Total santé en % du PIB",
-  # Mortalité évitable
-  "Mortalité évitable globale", 
-  "Mortalité évitable par mesure préventive", 
-  "Mortalité évitable avec traitement adapté",
+
   # Revenus RH (vs salaire moyen)
   "Salaire med généralistes/salaire moyen", 
   "Salaire infirmiers/salaire moyen", 
   "Salaire spécialistes/salaire moyen",
+  
   # Revenus RH (vs PIB/hab)
   "Salaire med généralistes / PIB/hab", 
   "Salaire infirmiers / PIB/hab", 
   "Salaire spécialistes / PIB/hab",
+  
   # Emploi RH santé
   "nbr Personnel soignant/1000 hab", 
   "nbr Dentistes/1000 hab", 
@@ -696,8 +688,13 @@ dict[, var_label_fr := c(
   "nbr Psychiatres/1000 hab", 
   "nbr Spécialistes médicaux/1000 hab", 
   "nbr Chirurgiens spécialistes/1000 hab", 
-  "nbr Sages-femmes /1000 naissances", 
   "nbr Obstétriciens/Gynéco/1000 naissances",
+    # Emploi hospitalier
+  "nbr Autres prestataires hospitaliers/1000 hab", 
+  "nbr Infirmiers/sages-femmes hôpital/1000 hab",  
+  "nbr total employés dans l'hôpital/1000 hab", 
+  
+  
   # % emploi RH
   "% emploi travail social parmis les travailleurs de la santé", 
   "% pédiatres parmis les travailleurs de la santé", 
@@ -708,15 +705,13 @@ dict[, var_label_fr := c(
   "% psychiatres parmis les travailleurs de la santé", 
   "% spécialistes parmis les travailleurs de la santé", 
   "% chirurgiens parmis les travailleurs de la santé",
+  
   # Diplômés
   "Dentistes diplômés/100 000 hab", 
   "Sages-femmes diplômées/100 000 hab", 
   "Pharmaciens diplômés/100 000 hab", 
   "Infirmiers diplômés/100 000 hab",
-  # Emploi hospitalier
-  "nbr Autres prestataires hospitaliers/1000 hab", 
-  "nbr Infirmiers/sages-femmes hôpital/1000 hab",  
-  "nbr total employés dans l'hôpital/1000 hab",                    
+                 
   # Qualité & Sécurité
   "Mortalité cardio 30j/100 admissions", 
   "Hospitalisations évitables Asthme ou BPCO/100 000 hab", 
@@ -728,19 +723,32 @@ dict[, var_label_fr := c(
   "Amputations de peronnes diabètiques/100 000 hab", 
   "Hospitalisation de peronnes diabètiques/100 000 hab", 
   "Mortalité AVC hémorragique 30j/100 admissions", 
-  "Mortalité AVC ischémique 30j/100 admissions", 
+  "Mortalité AVC ischémique 30j/100 admissions",
+  
+    # Mortalité évitable
+  "Mortalité évitable globale", 
+  "Mortalité évitable par mesure préventive", 
+  "Mortalité évitable avec traitement adapté",
+  
   "Esperance de vie (années)"
 )]
 
 
 Labels_dict_wide <- dict
-save(Labels_dict_wide, file = "../data/Labels_dict_wide.RData")
+```
 
-library(data.table)
-library(dplyr)
+## save Dict
+```{r}
+saveRDS(Labels_dict_wide, file = "../data/Labels_dict.rds")
 
-# --- 1. Définir les groupes thématiques ----
+```
 
+
+
+#  Parition et calcul des scores
+
+
+```{r}
 vars_groupes <- list(
   mortalite_evitable = c(
     "Mortalité évitable globale",
@@ -749,7 +757,7 @@ vars_groupes <- list(
   ),
 
   
-  ressources_humaines = c(
+  ressources_humaines_sante = c(
     "nbr Personnel soignant/1000 hab",
     "nbr Dentistes/1000 hab",
     "nbr Pédiatres généraux/1000 hab",
@@ -765,7 +773,6 @@ vars_groupes <- list(
     "nbr Psychiatres/1000 hab",
     "nbr Spécialistes médicaux/1000 hab",
     "nbr Chirurgiens spécialistes/1000 hab",
-    "nbr Sages-femmes /1000 naissances",
     "nbr Obstétriciens/Gynéco/1000 naissances",
     "nbr Autres prestataires hospitaliers/1000 hab",
     "nbr Infirmiers/sages-femmes hôpital/1000 hab",
@@ -788,15 +795,21 @@ vars_groupes <- list(
   
   esperance_de_vie = c("Esperance de vie (années)")
 )
+```
 
-save(vars_groupes, file = "../data/vars_groupes_scores.RData")
+# save groupes de variables pour scores 
+```{r}
+saveRDS(vars_groupes, file = "../data/vars_groupes_scores.rds")
+```
 
+
+```{r}
 # --- 2. Définir si chaque groupe est à maximiser ou minimiser ----
 # TRUE = plus c’est haut, mieux c’est ; FALSE = plus c’est bas, mieux c’est
 
 orientation <- list(
   mortalite_evitable = FALSE,
-  ressources_humaines = TRUE,
+  ressources_humaines_sante = TRUE,
   qualite_soins = FALSE,
   esperance_de_vie = TRUE
 )
@@ -808,15 +821,19 @@ $$\tilde{x}{ij} =
 \frac{x{ij} - \min(\mathbf{x}_j)}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à maximiser}, 
 \frac{\max(\mathbf{x}j) - x{ij}}{\max(\mathbf{x}_j) - \min(\mathbf{x}_j)} & \text{si } x_j \text{ est à minimiser.}
 \end{cases}$$
-Ainsi, toutes les variables normalisées sont dans l'intervalle \[0,1\] et un score plus élevé est toujours préférable. Si un groupe g contient pg​ variables, le score du pays i pour ce groupe est la moyenne des variables normalisées dans le groupe : $$
-S_i(g) = \frac{1}{p_g} \sum_{j \in g} \tilde{x}_{ij}
-$$ où j∈g parcourt les variables appartenant au groupe g . Si on a G groupes de variables, chaque groupe g pouvant avoir un poids wg​ (par défaut, poids égaux si non spécifiés), le score global du pays i est calculé comme suit :
+
+Ainsi, toutes les variables normalisées sont dans l'intervalle \[0,1\] et un score plus élevé est toujours préférable. Si un groupe g contient pg​ variables, le score du pays i pour ce groupe est la moyenne des variables normalisées dans le groupe : 
+$$
+S_i(g) = \frac{1}{p_g} \sum_{j \in g} \tilde{x}_{ij}$$ 
+
+où j∈g parcourt les variables appartenant au groupe g . Si on a G groupes de variables, chaque groupe g pouvant avoir un poids wg​ (par défaut, poids égaux si non spécifiés), le score global du pays i est calculé comme suit :
 
 $$
 S_{i}^{\text{global}} = \frac{\sum_{g=1}^G w_g , S_i(g)}{\sum_{g=1}^G w_g}
 $$
 
 Dans le cas où tous les groupes ont le même poids, la formule se simplifie en : 
+
 $$S_{i}^{\text{global}} = \frac{1}{G} \sum_{g=1}^G S_i(g)$$
 
 
@@ -850,6 +867,7 @@ calc_score_global <- function(dt, id_col = "REF_AREA") {
     
     scores_groupes[[g]] <- dt_norm[, .(get(id_col), score_groupe)]
     setnames(scores_groupes[[g]], c("V1", "score_groupe"), c(id_col, g))
+    print(g)
   }
   
   scores_global <- Reduce(function(x, y) merge(x, y, by = id_col, all = TRUE), scores_groupes)
@@ -857,10 +875,54 @@ calc_score_global <- function(dt, id_col = "REF_AREA") {
   
   return(scores_global)
 }
+```
 
-scores <- calc_score_global(merged_inputed)
+```{r}
+setnames(dt_excl, old = dict$var_full, new = dict$var_label_fr)
+```
+
+```{r}
+scores <- calc_score_global(dt_excl)
+```
 
 
-save(scores, file = "../data/scores_global.RData")
+```{r}
+scores<- as.data.table(scores)
+scores
+```
+
+
+## save scores globaux
+```{r}
+saveRDS(scores, file = "../data/scores_globaux.rds")
+```
+
+
+```{r}
+selectInput("score_dim", "Dimension :", 
+            choices = names(vars_groupes_scores),
+            selected = "score_global")
+```
+
+
+```{r}
+geo_sf <- merge(geo_sf, scores, by = "REF_AREA", all.x = TRUE)
+```
+
+```{r}
+geo_sf$qualite_soins
+```
+
+
+```{r}
+pal <- colorNumeric("RdYlGn", domain = geo_sf$qualite_soins, na.color = "grey90")
+
+leafletProxy("map") %>%
+  clearShapes() %>%
+  addPolygons(
+    data = geo_sf,
+    fillColor = ~pal,
+    label = ~paste0(sovereignt, ": ", round(qualite_soins, 2))
+  )
 ```
 
