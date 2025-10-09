@@ -17,11 +17,11 @@ library(bsicons)
 # Charger la carte du monde pour la visualisation
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
-preloaded_datasets <- list.files("Data/", pattern = "\\.rds$", full.names = FALSE)
+preloaded_datasets <- list.files("../Data/", pattern = "\\.rds$", full.names = FALSE)
 
 # But : trouve automatiquement les colonnes d'intérêt issue du jeu de données
 # Entrée : le jeu de données brut
-# Sortie : une liste avec comme nom : "time"       "country"    "value"      "unit"       "indicators"
+# Sortie : une liste avec comme nom : "time" "country" "value" "unit" "indicators"
 
 
 identify_columns <- function(df) {

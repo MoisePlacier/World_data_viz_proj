@@ -1,5 +1,6 @@
 
 source("UI_Fluid_Raw_Moïse.R")
+source("fluid_page_jules.R")
 library(shiny)
 library(leaflet)
 library(data.table)
@@ -12,9 +13,8 @@ ui <- navbarPage(
   "World Health Dashboard",
   
   # --- Landing page ---
-  tabPanel("Accueil",
-           fluidPage(
-             h2("Bienvenue sur le tableau de bord des systèmes de santé"))),
+  tabPanel("Apperçu des données",
+           fluidPage(fluid_page_accueil)),
   
   # --- Comparaison des systèmes de santé ---
   tabPanel("Comparaison",

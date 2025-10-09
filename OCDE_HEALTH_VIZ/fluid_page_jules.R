@@ -5,9 +5,9 @@ fluid_page_accueil <- fluidPage(
   titlePanel("Visualisation des données OCDE"),
   br(),
   theme = bs_theme(
-    bootswatch = "darkly",
-    base_font = font_google("Inter"),
-    navbar_bg = "#25443B"
+    bootswatch = "minty"#,
+    #base_font = font_google("Inter")#,
+    #navbar_bg = "#25443B"
   ),
   sidebarLayout( # séparé en deux : le sidebar panel avec les selecteurs et le main panel avec la carte et les graphs
     sidebarPanel(

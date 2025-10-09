@@ -1,4 +1,4 @@
-server <- function(input, output, session) {
+server_accueil <- function(input, output, session) {
   
   # Stockage des données chargées depuis une URL
   custom_data <- reactiveVal(NULL)
@@ -15,7 +15,7 @@ server <- function(input, output, session) {
       sdmx_data <- readSDMX(input$custom_url)
       df <- as.data.frame(sdmx_data)
       # Sauvegarder dans le fichier des datasets préchargés
-      saveRDS(df, file = paste0("data/", input$file_name, ".rds"))
+      saveRDS(df, file = paste0("../Data/", input$file_name, ".rds"))
       
       
       # Identifier et valider les colonnes
@@ -45,7 +45,7 @@ server <- function(input, output, session) {
   data <- reactive({
     if (input$mode == "preloaded") {
       req(input$dataset_preloaded)
-      readRDS(file.path("data", input$dataset_preloaded))
+      readRDS(file.path("../Data/", input$dataset_preloaded))
     } else {
       req(custom_data())
       custom_data()
