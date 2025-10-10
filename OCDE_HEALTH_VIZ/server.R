@@ -3,7 +3,6 @@ library(RColorBrewer)
 library(shiny)
 library(leaflet)
 library(data.table)
-library(dplyr)
 library(sf)
 library(rnaturalearth)
 library(rnaturalearthdata)
@@ -14,6 +13,15 @@ source("fonctions_jules.R")
 source("fonctions_tom.R")
 library(DT)
 library(shinyBS) 
+library(plotly)
+
+
+library(countrycode)
+library(rsdmx)
+library(bslib)
+library(tidyverse)
+library(VIM)
+library(bsicons)
 
 # Enable thematic
 thematic::thematic_shiny(font = "auto")
@@ -56,18 +64,6 @@ vars_groupes_scores <- as.data.table(vars_groupes_scores)
 
 
 
-library(shiny)
-library(ggplot2)
-library(dplyr)
-library(leaflet)
-library(rnaturalearth)
-library(sf)
-library(countrycode)
-library(rsdmx)
-library(bslib)
-library(tidyverse)
-library(VIM)
-library(bsicons)
 
 
 ############## Datas Jules 

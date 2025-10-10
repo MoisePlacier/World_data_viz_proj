@@ -10,7 +10,7 @@ FR_Condi <- fluidRow(
     width = 4,
     style = "background-color:#f9f9f9; padding:15px; border-radius:10px; height:100%;",
     
-    h4("🔧 Paramètres de visualisation"),
+    h4("Exploration des données agrégées sur la période 2015–2020, à partir des moyennes observées."),
     
     
     # Choix du mode de visualisation
